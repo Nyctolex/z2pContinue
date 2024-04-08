@@ -1,0 +1,1 @@
+bash ./scripts/train_regular.sh ./datasets/renders_shade_abs ./datasets/renders_shade_abs_test exports/train_regulary
