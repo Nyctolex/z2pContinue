@@ -104,14 +104,14 @@ class GenericDataset(Dataset):
         self.keys = keys
 
     def control_length(self):
-        _, _, settings = self[0]
+        _, _, _, _,  _, settings = self[0]
         return settings.shape[0]
 
     def __len__(self):
         # This returns the total number of examples for all shapes
         return len(self.inverter)
 
-    def __getitem__(self, item, return_gray_scale=True, return_outlines=True):
+    def __getitem__(self, item):
         # map between global index to a specific example in a specific shape
         shape_index, item_index = self.inverter[item]
         img_path, z_buffer_path = self.shapes[shape_index][item_index]
@@ -137,13 +137,7 @@ class GenericDataset(Dataset):
         img, zbuffer = rtn
         outline = img[0:3, :, :].sum(axis=0) > 0
         gray_scale = img[0:3, :, :].mean(axis=0)
-        if return_outlines and return_gray_scale:
-            return img, zbuffer, settings_vector, outline, gray_scale
-        if return_outlines:
-            return img, zbuffer, settings_vector, outline
-        if return_gray_scale:
-            return img, zbuffer, settings_vector, gray_scale
-        return img, zbuffer, settings_vector
+        return str(img_path), img, outline, gray_scale,  zbuffer, settings_vector
 
 
 def scatter(u_pix, v_pix, distances, res, radius=5, dr=(0, 0), const=6, scale_const=0.7):
