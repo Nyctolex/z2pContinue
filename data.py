@@ -111,7 +111,7 @@ class GenericDataset(Dataset):
         # This returns the total number of examples for all shapes
         return len(self.inverter)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item, return_gray_scale=True, return_outlines=True):
         # map between global index to a specific example in a specific shape
         shape_index, item_index = self.inverter[item]
         img_path, z_buffer_path = self.shapes[shape_index][item_index]
@@ -135,7 +135,14 @@ class GenericDataset(Dataset):
 
         settings_vector = torch.cat(settings_vector)
         img, zbuffer = rtn
-
+        outline = img[0:3, :, :].sum(axis=0) > 0
+        gray_scale = img[0:3, :, :].mean(axis=0)
+        if return_outlines and return_gray_scale:
+            return img, zbuffer, settings_vector, outline, gray_scale
+        if return_outlines:
+            return img, zbuffer, settings_vector, outline
+        if return_gray_scale:
+            return img, zbuffer, settings_vector, gray_scale
         return img, zbuffer, settings_vector
 
 
