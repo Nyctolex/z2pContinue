@@ -1,11 +1,11 @@
 import argparse
 from inspect import getmembers, isfunction
 from pathlib import Path
-
+from time import time
 import cv2 as cv
 import torch
 from torch.utils.data import DataLoader
-
+from checkpoint_utils import CheckpointTracker
 import data as data
 import losses
 import util
@@ -58,31 +58,53 @@ def train(opts):
                               shuffle=True, num_workers=opts.num_workers, pin_memory=True)
     test_loader = DataLoader(test_set, batch_size=opts.batch_size,
                              shuffle=True, num_workers=opts.num_workers, pin_memory=True)
-
+    sum_train_time = 0
+    train_times_count = 0
     num_samples = len(train_loader)
-    model = PosADANet(input_channels=1, output_channels=4, n_style=control_vector_length,
-                      padding=opts.padding, bilinear=not opts.trans_conv,
-                      nfreq=opts.nfreq, magnitude=opts.freq_magnitude).to(device)
+    if opts.checkpoint_dir is not None and \
+            (checkpoint_handler:= CheckpointTracker.load_checkpoint_tracker(opts.checkpoint_dir)) is not None:
+        print('loaded checkpoint')
+        model = checkpoint_handler.get_model().to(device)
+        optimizer = checkpoint_handler.get_optimizer()
+        start_epoch = checkpoint_handler.get_current_epoch()
 
-    if opts.checkpoint is not None:
-        model.load_state_dict(torch.load(opts.checkpoint))
+    else:
+        model = PosADANet(input_channels=1, output_channels=4, n_style=control_vector_length,
+                          padding=opts.padding, bilinear=not opts.trans_conv,
+                          nfreq=opts.nfreq, magnitude=opts.freq_magnitude).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=opts.lr)
+        checkpoint_handler = CheckpointTracker(str(opts.checkpoint_dir))
+        start_epoch = 0
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=opts.lr)
-    global_step = 0
-    avg_loss = util.RunningAverage()
-    avg_test_loss = util.RunningAverage()
-    for epoch in range(opts.start_epoch, opts.epochs):
-        avg_loss.reset()
+
+    for epoch in range(start_epoch, opts.epochs):
         model.train()
-        for i, (img, zbuffer, color) in enumerate(train_loader):
+        checkpoint_handler.train()
+        for i, (img_paths, img, outline, gray_scale,  zbuffer, settings_vector) in enumerate(train_loader):
+            start_time = time()
+            if checkpoint_handler.skip_training:
+                # If we paused in the testing phase, we should skip the training phase
+                checkpoint_handler.skip_training = False
+                break
+            unseen = checkpoint_handler.get_unseen_points(img_paths)
+            all_seen = not any(unseen)
+            if all_seen:
+                continue
+            img = img[unseen]
+            outline = outline[unseen]
+            gray_scale = gray_scale[unseen]
+            zbuffer = zbuffer[unseen]
+            settings_vector = settings_vector[unseen]
             print(f'Epoch {epoch}    Itteration {i}/len{len(train_loader)}')
             optimizer.zero_grad()
-
             img: torch.Tensor = img.float().to(device)
             zbuffer: torch.Tensor = zbuffer.float().to(device)
-            color = color.float().to(device)
+            settings_vector = settings_vector.float().to(device)
+            outline = outline.float().to(device)
+            gray_scale = gray_scale.float().to(device)
 
-            generated = model(zbuffer.float(), color)
+
+            generated = model(zbuffer.float(), settings_vector)
             loss = 0
             for weight, lname in zip(opts.l_weight, opts.losses):
                 loss += weight * get_loss_function(lname)(generated, img)
@@ -91,36 +113,57 @@ def train(opts):
                 loss.backward()
                 optimizer.step()
 
-            if global_step % opts.log_iter == 0:
+            if i % opts.log_iter == 0:
                 expanded_z_buffer = zbuffer.repeat((1, 4, 1, 1))
                 expanded_z_buffer[:, -1, :, :] = 1.0
                 cat_img = torch.cat([img, generated, expanded_z_buffer.clamp(0, 1)], dim=2)
-                log_images(train_export_dir, f'train_imgs{global_step}', cat_img.detach(), color)
+                log_images(train_export_dir, f'train_imgs{i}', cat_img.detach(), settings_vector)
 
-            global_step += 1
-
-            avg_loss.add(loss.item())
+            checkpoint_handler.add_train_loss(loss.item())
+            checkpoint_handler.add_seen_paths(img_paths)
             print(f'{run_name}; epoch: {epoch}; iter: {i}/{num_samples} loss: {loss}')
+            sum_train_time += time() - start_time
+            train_times_count += 1
+            if i % opts.checkpoint_every == 0:
+                print('saving checkpoint')
+                print(f'average train time: {sum_train_time / train_times_count} seconds per iteration')
+                checkpoint_handler.save_all(model, optimizer)
 
         model.eval()
-        avg_test_loss.reset()
-        for i, (img, zbuffer, color) in enumerate(test_loader):
+        checkpoint_handler.test()
+        for i, (img_paths, img, outline, gray_scale,  zbuffer, settings_vector) in enumerate(test_loader):
             with torch.no_grad():
+                unseen = checkpoint_handler.get_unseen_points(img_paths)
+                all_seen = not any(unseen)
+                if all_seen:
+                    continue
+                img = img[unseen]
+                outline = outline[unseen]
+                gray_scale = gray_scale[unseen]
+                zbuffer = zbuffer[unseen]
+                settings_vector = settings_vector[unseen]
+
                 zbuffer = zbuffer.float().to(device)
-                color = color.float().to(device)
+                settings_vector = settings_vector.float().to(device)
                 img = img.float().to(device)
-                generated = model(zbuffer.float(), color)
+                outline = outline.float().to(device)
+                gray_scale = gray_scale.float().to(device)
+
+                generated = model(zbuffer.float(), settings_vector)
                 test_loss = 0
                 for weight, lname in zip(opts.l_weight, opts.losses):
                     test_loss += weight * get_loss_function(lname)(generated, img)
-                avg_test_loss.add(test_loss.item())
+                checkpoint_handler.add_test_loss(test_loss.item())
 
                 expanded_z_buffer = zbuffer.repeat((1, 4, 1, 1))
                 expanded_z_buffer[:, -1, :, :] = 1
                 cat_img = torch.cat([img, generated, expanded_z_buffer.clamp(0, 1)], dim=2)
-                log_images(test_export_dir, f'pairs_epoch_{epoch}', cat_img.detach(), color)
+                log_images(test_export_dir, f'pairs_epoch_{epoch}', cat_img.detach(), settings_vector)
+            checkpoint_handler.add_seen_paths(img_paths)
 
-        print(f'average train loss: {avg_loss.get_average()}')
+        print(f'average train loss: {checkpoint_handler.get_avg_train_loss()}')
+        print(f'average test loss: {checkpoint_handler.get_avg_test_loss()}')
+        checkpoint_handler.end_epoch()
 
         torch.save(model.state_dict(), opts.export_dir / f'epoch:{epoch}.pt')
 
@@ -130,8 +173,9 @@ if __name__ == '__main__':
     parser.add_argument('--data', type=Path)
     parser.add_argument('--export_dir', type=Path)
     parser.add_argument('--test_data', type=Path)
-    parser.add_argument('--checkpoint', type=Path, default=None)
-    parser.add_argument('--start_epoch', type=int, default=0)
+    parser.add_argument('--checkpoint_dir', type=Path, default=None)
+    parser.add_argument('--checkpoint_every', type=int, default=10)
+    # parser.add_argument('--start_epoch', type=int, default=0)
     parser.add_argument('--batch_size', type=int)
     parser.add_argument('--test_batch_size', type=int, default=10)
     parser.add_argument('--num_workers', type=int)
