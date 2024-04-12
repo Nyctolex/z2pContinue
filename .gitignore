@@ -8,3 +8,5 @@ datasets/renders_shade_abs/0033/view_102/7.npy
 *.idea
 *.ipynb_checkpoints
 *.pkl
+
+draft*.ipynb
