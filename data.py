@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 import cv2
 import numpy as np
@@ -96,6 +97,8 @@ class GenericDataset(Dataset):
         self.cache = cache
         # read all shapes with positive amount of views
         for s in self.shape_paths:
+            if not os.path.isdir(s):
+                continue
             t_shape = Shape(s)
             if len(t_shape) > 0:
                 self.shapes.append(t_shape)
