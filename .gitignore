@@ -1,5 +1,5 @@
 
-datasets/renders_shade_abs/0033/view_102/7.npy
+datasets/renders_shade_abs*
 *.npy
 *.xyz
 *.png
@@ -8,3 +8,7 @@ datasets/renders_shade_abs/0033/view_102/7.npy
 *.idea
 *.ipynb_checkpoints
 *.pkl
+
+draft*.ipynb
+
+*/.DS_Store
