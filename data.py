@@ -115,6 +115,11 @@ class GenericDataset(Dataset):
         return len(self.inverter)
 
     def __getitem__(self, item):
+        """
+        :param item:
+        :return: :return: (string, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor)
+        target_image (NXMX3), z_buffer (NXM)
+        """
         # map between global index to a specific example in a specific shape
         shape_index, item_index = self.inverter[item]
         img_path, z_buffer_path = self.shapes[shape_index][item_index]
@@ -138,7 +143,17 @@ class GenericDataset(Dataset):
 
         settings_vector = torch.cat(settings_vector)
         img, zbuffer = rtn
-        outline = img[0:3, :, :].sum(axis=0) > 0
+        # outline
+        t_lower = 2  # Lower Threshold
+        t_upper = 50  # Upper threshold
+        outline = cv2.Canny(cv2.GaussianBlur(img, (5, 5), 0), t_lower, t_upper)
+
+        img = torch.from_numpy(img)
+        img = img.permute(2, 0, 1) / 255
+        zbuffer = torch.from_numpy(zbuffer)
+        zbuffer = zbuffer.unsqueeze(0)
+        outline = torch.from_numpy(outline)
+
         gray_scale = img[0:3, :, :].mean(axis=0)
         return str(img_path), img, outline, gray_scale,  zbuffer, settings_vector
 
@@ -182,7 +197,7 @@ def load_files(png_path, npy_path, splat_size=5, cache=True, dr=(0, 0)):
     :param png_path: path to the png target image
     :param npy_path: path to the npy containg the points
     :param cache: if True used caches Z-buffers else False
-    :return: (torch.Tensor, torch.Tensor) target_image (3XNXM), z_buffer (1XNXM)
+    :return: (np.array, np.array) target_image (NXMX3), z_buffer (NXM)
     """
     if png_path is not None:
         img = cv2.imread(str(png_path), cv2.IMREAD_UNCHANGED)
@@ -191,8 +206,6 @@ def load_files(png_path, npy_path, splat_size=5, cache=True, dr=(0, 0)):
 
         img = img[RANGES[0][0]: RANGES[0][1], RANGES[1][0]:RANGES[1][1], :]
         img = resize(img)
-        img = torch.from_numpy(img)
-        img = img.permute(2, 0, 1) / 255
 
     if cache:
         cache_path = npy_path.parent / npy_path.name.replace('.npy', '_cache.npy')
@@ -208,9 +221,6 @@ def load_files(png_path, npy_path, splat_size=5, cache=True, dr=(0, 0)):
 
     z_buffer = z_buffer[RANGES[0][0]: RANGES[0][1], RANGES[1][0]:RANGES[1][1]]
     z_buffer = resize(z_buffer)
-
-    z_buffer = torch.from_numpy(z_buffer)
-    z_buffer = z_buffer.unsqueeze(0)
 
     if png_path is not None:
         return img, z_buffer
