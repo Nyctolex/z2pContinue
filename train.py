@@ -40,7 +40,9 @@ def train(opts):
     test_export_dir.mkdir(exist_ok=True)
     run_name = opts.export_dir.name
 
-    device = torch.device(torch.cuda.current_device() if torch.cuda.is_available() else torch.device('cpu'))
+    device = torch.device(
+        torch.cuda.current_device() if torch.cuda.is_available() else 
+        torch.device("mps") if torch.backends.mps.is_available() else torch.device('cpu'))
     print(f'using {device}')
     print('loading train set')
     train_set = data.GenericDataset(opts.data, splat_size=opts.splat_size, cache=opts.cache,

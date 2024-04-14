@@ -1,5 +1,5 @@
 
-datasets/renders_shade_abs*
+datasets*
 *.npy
 *.xyz
 *.png
@@ -12,3 +12,4 @@ datasets/renders_shade_abs*
 draft*.ipynb
 
 */.DS_Store
+logs/*
