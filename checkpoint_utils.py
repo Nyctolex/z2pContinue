@@ -103,7 +103,7 @@ class CheckpointHandler:
             file_name = f'{session_name}_checkpoint_epoch_{epoch}.pkl'
         else:
             files = list(checkpoint_dir.iterdir())
-            files = [f for f in files if f.is_file() and 'checkpoint_epoch' in f.name]
+            files = [f for f in files if f.is_file() and f'{session_name}_checkpoint_epoch_' in f.name]
             if len(files) == 0:
                 return None
             #get last epoch
