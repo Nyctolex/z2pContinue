@@ -29,7 +29,7 @@ class PosADANet(nn.Module):
         return self.positional_encoding
 
     def __init__(self, input_channels, output_channels, n_style, bilinear=True, padding='zero', full_ada=True,
-                 nfreq=20, magnitude=10):
+                 nfreq=20, magnitude=10, nof_layers=4, style_enc_layers=6, start_channels=64):
         super(PosADANet, self).__init__()
         factor = 2 if bilinear else 1
         self.omega = nn.Parameter(torch.rand(nfreq) * magnitude)
@@ -38,42 +38,30 @@ class PosADANet(nn.Module):
         self.full_ada = full_ada
         self.n_style = n_style
 
-        self.style_encoder = FullyConnected(n_style, W_SIZE, layers=6)
+        self.style_encoder = FullyConnected(n_style, W_SIZE, layers=style_enc_layers)
         self.padding = padding
         self.input_channels = input_channels + nfreq * 4
         self.n_classes = output_channels
         self.bilinear = bilinear
-        self.channels = [512 // factor, 256 // factor, 128 // factor]
-        self.inc = DoubleConv(self.input_channels, 64)
-        self.down1 = Down(64, 128, padding=padding, ada=self.full_ada)
-        self.down2 = Down(128, 256, padding=padding, ada=self.full_ada)
-        self.down3 = Down(256, 512, padding=padding, ada=self.full_ada)
-        self.down4 = Down(512, 1024 // factor, padding=padding, ada=self.full_ada)
-        self.up1 = Up(1024, 512 // factor, bilinear, ada=True, padding=padding)
-        self.up2 = Up(512, 256 // factor, bilinear, ada=True, padding=padding)
-        self.up3 = Up(256, 128 // factor, bilinear, ada=True, padding=padding)
-        self.up4 = Up(128, 64, bilinear, padding=padding, ada=True)
-        self.outc = OutConv(64, output_channels, padding=padding)
+        self.inc = DoubleConv(self.input_channels, start_channels)
+        self.down = nn.ModuleList([Down(start_channels*(2**i), start_channels*(2**(i+1)), padding=padding, ada=self.full_ada) for i in range(nof_layers-1)])
+        self.down.append(Down(start_channels*(2**(nof_layers-1)), start_channels*(2**nof_layers) // factor, padding=padding, ada=self.full_ada))
+        self.up = nn.ModuleList([Up(start_channels*(2**i), start_channels*(2**(i-1)) // factor, bilinear, ada=True, padding=padding) for i in range(nof_layers,1,-1)])
+        self.up.append(Up(start_channels*2, start_channels, bilinear, ada=True, padding=padding))
+        self.outc = OutConv(start_channels, output_channels, padding=padding)
 
     def forward(self, x, style):
-        w = self.style_encoder(style)
+        w = self.style_encoder(style) if self.full_ada else None
         encoding = self.get_encoding(x)
         x = torch.cat([x, encoding], dim=1)
-
-        x1 = self.inc(x)
-        if self.full_ada:
-            x2 = self.down1(x1, w=w)
-            x3 = self.down2(x2, w=w)
-            x4 = self.down3(x3, w=w)
-            x5 = self.down4(x4, w=w)
-        else:
-            x2 = self.down1(x1)
-            x3 = self.down2(x2)
-            x4 = self.down3(x3)
-            x5 = self.down4(x4)
-        x = self.up1(x5, x4, w=w)
-        x = self.up2(x, x3, w=w)
-        x = self.up3(x, x2, w=w)
-        x = self.up4(x, x1, w=w)
+        #Down pass:
+        x_down = [self.inc(x)]
+        for layer in self.down:
+            x_down.append(layer(x_down[-1], w=w))
+        #Up pass:
+        x = x_down.pop(-1)
+        for layer in self.up:
+            x = layer(x, x_down.pop(-1), w=w)
         logits = self.outc(x)
         return logits
+
