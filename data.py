@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-
+from util import TrainingStrategy
 RANGES = [[0, 540], [100, 960]]
 TARGET = [500, -1]
 
@@ -88,9 +88,10 @@ class Shape:
 
 
 class GenericDataset(Dataset):
-    def __init__(self, folder: Path, keys=('colors', 'light_sph_relative'),
+    def __init__(self, folder: Path,train_strategy:TrainingStrategy|None = None, keys=('colors', 'light_sph_relative'),
                  splat_size=3, cache=True):
         self.folder = Path(folder)
+        self.train_strategy = train_strategy
         self.splat_size = splat_size
         self.shape_paths = list(self.folder.iterdir())
         self.shapes = []
@@ -107,7 +108,7 @@ class GenericDataset(Dataset):
         self.keys = keys
 
     def control_length(self):
-        _, _, _, _,  _, settings = self[0]
+        settings = self[0][-1]
         return settings.shape[0]
 
     def __len__(self):
@@ -143,19 +144,29 @@ class GenericDataset(Dataset):
 
         settings_vector = torch.cat(settings_vector)
         img, zbuffer = rtn
-        # outline
-        t_lower = 2  # Lower Threshold
-        t_upper = 50  # Upper threshold
-        outline = cv2.Canny(cv2.GaussianBlur(img, (5, 5), 0), t_lower, t_upper)
+
+        generate_outline = self.train_strategy == TrainingStrategy.OUTLINE or self.train_strategy is None
+        if  generate_outline:
+            t_lower = 2  # Lower Threshold
+            t_upper = 50  # Upper threshold
+            outline = cv2.Canny(cv2.GaussianBlur(img, (5, 5), 0), t_lower, t_upper)
+            outline = torch.from_numpy(outline)
 
         img = torch.from_numpy(img)
         img = img.permute(2, 0, 1) / 255
         zbuffer = torch.from_numpy(zbuffer)
         zbuffer = zbuffer.unsqueeze(0)
-        outline = torch.from_numpy(outline)
+        generate_grayscale = self.train_strategy == TrainingStrategy.GRAYSCALE or self.train_strategy is None
+        if generate_grayscale:
+            gray_scale = img[0:3, :, :].mean(axis=0)
 
-        gray_scale = img[0:3, :, :].mean(axis=0)
-        return str(img_path), img, outline, gray_scale,  zbuffer, settings_vector
+        if generate_outline and generate_outline:
+            return str(img_path), img, outline, gray_scale,  zbuffer, settings_vector
+        elif generate_grayscale:
+            return str(img_path), img, gray_scale, zbuffer, settings_vector
+        elif generate_outline:
+            return str(img_path), img, outline, zbuffer, settings_vector
+        return str(img_path), img, outline, gray_scale, zbuffer, settings_vector
 
 
 def scatter(u_pix, v_pix, distances, res, radius=5, dr=(0, 0), const=6, scale_const=0.7):
