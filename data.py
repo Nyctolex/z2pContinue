@@ -163,7 +163,7 @@ class GenericDataset(Dataset):
             gray_scale = gray_scale.unsqueeze(0)
 
         if generate_outline and generate_outline:
-            return str(img_path), img, outline, gray_scale,  zbuffer, settings_vector
+            return str(img_path), img, outline,  zbuffer, settings_vector
         elif generate_grayscale:
             return str(img_path), img, gray_scale, zbuffer, settings_vector
         elif generate_outline:
