@@ -103,7 +103,7 @@ class Trainer:
         opts = self.opts
         if opts.checkpoint_dir is not None and \
                 (checkpoint_handler := CheckpointHandler.load_checkpoint(opts.checkpoint_dir, opts.session_name)) is not None:
-            print('loaded checkpoint')
+            logger.debug('loaded checkpoint')
             model = checkpoint_handler.get_model().to(self.device)
             optimizer = checkpoint_handler.get_optimizer()
             start_epoch = checkpoint_handler.get_current_epoch()
@@ -197,27 +197,31 @@ class Trainer:
         return loss
 
     @staticmethod
-    def parse_zbuffer( zbuffer: torch.Tensor) -> torch.Tensor:
-        expanded_z_buffer = zbuffer.repeat((1, 4, 1, 1))
-        expanded_z_buffer[:, -1, :, :] = 1.0
-        return expanded_z_buffer
-    def log_images(self, data: tuple, prediction: torch.Tensor, iteration: int):
+    def expand_dimensions(one_channel_image: torch.Tensor) -> torch.Tensor:
+        one_channel_image_buffer = one_channel_image.repeat((1, 4, 1, 1))
+        one_channel_image_buffer[:, -1, :, :] = 1.0
+        return one_channel_image_buffer.clamp(0, 1)
+    def log_images(self, data: tuple, prediction: torch.Tensor, iteration: int, export_dir: Path):
 
         if self.train_strategy == TrainingStrategy.OUTLINE:
-            img_paths, zbuffer, settings_vector, outline = data
-            expanded_z_buffer = self.parse_zbuffer(zbuffer)
-            cat_img = torch.cat([outline, prediction, expanded_z_buffer.clamp(0, 1)], dim=2)
-            log_images(self.train_export_dir, f'train_imgs{iteration}', cat_img.detach(), settings_vector)
+            prediction = self.expand_dimensions(prediction)
+            _, zbuffer, settings_vector, outline = data
+            target = self.expand_dimensions(outline)
+            source = self.expand_dimensions(zbuffer)
+
 
         elif self.train_strategy == TrainingStrategy.GRAYSCALE:
-            img_paths, zbuffer, settings_vector, gray_scale = data
-            expanded_z_buffer = self.parse_zbuffer(zbuffer)
-            cat_img = torch.cat([gray_scale, prediction, expanded_z_buffer.clamp(0, 1)], dim=2)
-            log_images(self.train_export_dir, f'train_imgs{iteration}', cat_img.detach(), settings_vector)
+            prediction = self.expand_dimensions(prediction)
+            _, zbuffer, settings_vector, gray_scale = data
+            target = self.expand_dimensions(gray_scale)
+            source = self.expand_dimensions(zbuffer)
         elif self.train_strategy == TrainingStrategy.COLOR:
             raise NotImplementedError('Training strategy not implemented')
         else:
             raise NotImplementedError('Training strategy not implemented')
+
+        cat_img = torch.cat([target, prediction, source], dim=2)
+        log_images(export_dir, f'train_imgs{iteration}', cat_img.detach(), settings_vector)
 
 
     def train_epoch(self, epoch: int):
@@ -242,7 +246,7 @@ class Trainer:
                 self.optimizer.step()
 
             if i % self.opts.log_iter == 0:
-                self.log_images(data, prediction, i)
+                self.log_images(data, prediction, i, self.train_export_dir)
 
             self.checkpoint_handler.add_train_loss(loss.item())
             img_paths = data[0]
@@ -258,6 +262,7 @@ class Trainer:
     def test(self):
         self.model.eval()
         self.checkpoint_handler.test()
+        self.checkpoint_handler.save_checkpoint(self.model, self.optimizer)
         for i, data in enumerate(self.test_loader):
             with torch.no_grad():
                 data = self.parse_data(data)
@@ -267,7 +272,7 @@ class Trainer:
                 img_paths = data[0]
                 test_loss = self.calc_loss(prediction, target)
                 self.checkpoint_handler.add_test_loss(test_loss.item())
-                self.log_images(data, prediction, i)
+                self.log_images(data, prediction, i, self.test_export_dir)
             self.checkpoint_handler.add_seen_paths(img_paths)
 
         logger.debug(f'average train loss: {self.checkpoint_handler.get_avg_train_loss()}')
@@ -277,9 +282,10 @@ class Trainer:
     def train(self):
         for epoch in range(self.start_epoch, self.opts.epochs):
             self.start_train()
-            self.train_epoch()
+            self.train_epoch(epoch)
             self.test()
             self.checkpoint_handler.end_epoch()
+            self.checkpoint_handler.save_checkpoint(self.model, self.optimizer)
             torch.save(self.model.state_dict(), self.opts.export_dir / f'epoch:{epoch}.pt')
 
 

@@ -102,13 +102,14 @@ class CheckpointHandler:
         if epoch is not None:
             file_name = f'{session_name}_checkpoint_epoch_{epoch}.pkl'
         else:
-            file_name = None
-            for f in checkpoint_dir.iterdir():
-                if f.is_file() and 'checkpoint_epoch' in f.name:
-                    file_name = f.name
-                    break
-            if file_name is None:
+            files = list(checkpoint_dir.iterdir())
+            files = [f for f in files if f.is_file() and 'checkpoint_epoch' in f.name]
+            if len(files) == 0:
                 return None
+            #get last epoch
+            files.sort(key=lambda x: int(x.name.split('_')[-1].split('.')[0]))
+            file_name = files[-1].name
+
         checkpoint_path = checkpoint_dir / file_name
 
         if not checkpoint_path.exists():

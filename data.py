@@ -151,6 +151,7 @@ class GenericDataset(Dataset):
             t_upper = 50  # Upper threshold
             outline = cv2.Canny(cv2.GaussianBlur(img, (5, 5), 0), t_lower, t_upper)
             outline = torch.from_numpy(outline)
+            outline = outline.unsqueeze(0)
 
         img = torch.from_numpy(img)
         img = img.permute(2, 0, 1) / 255
@@ -159,6 +160,7 @@ class GenericDataset(Dataset):
         generate_grayscale = self.train_strategy == TrainingStrategy.GRAYSCALE or self.train_strategy is None
         if generate_grayscale:
             gray_scale = img[0:3, :, :].mean(axis=0)
+            gray_scale = gray_scale.unsqueeze(0)
 
         if generate_outline and generate_outline:
             return str(img_path), img, outline, gray_scale,  zbuffer, settings_vector

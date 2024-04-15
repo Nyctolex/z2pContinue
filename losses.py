@@ -71,5 +71,5 @@ def background(generated, gt):
 
 
 
-def SIMM(generated, gt):
+def SSIM(generated, gt):
     return 1 - structural_similarity_index_measure(generated, gt, data_range =255)
