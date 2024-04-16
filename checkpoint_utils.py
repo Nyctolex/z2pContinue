@@ -4,14 +4,18 @@ import pickle
 
 
 class CheckpointHandler:
-    def __init__(self, checkpoint_dir: str, session_name: str):
-        assert isinstance(checkpoint_dir, str)
-        assert isinstance(session_name, str)
-        assert checkpoint_dir != '', 'Checkpoint directory cannot be empty'
-        assert session_name != '', 'Session name cannot be empty'
-        self.checkpoint_dir = Path(checkpoint_dir)
-        if not self.checkpoint_dir.exists():
-            self.checkpoint_dir.mkdir()
+    def __init__(self, checkpoint_dir: str | None, session_name: str):
+        if checkpoint_dir is None:
+            self.checkpoint_dir = None
+        else:
+            assert isinstance(session_name, str)
+            assert isinstance(checkpoint_dir, str)
+
+            assert checkpoint_dir != '', 'Checkpoint directory cannot be empty'
+            assert session_name != '', 'Session name cannot be empty'
+            self.checkpoint_dir = Path(checkpoint_dir)
+            if not self.checkpoint_dir.exists():
+                self.checkpoint_dir.mkdir()
         # set of all the datapoints seen so far
         self.datapoint_paths = set()
         self._running_train_loss = RunningAverage()
@@ -84,6 +88,8 @@ class CheckpointHandler:
         :param free_space: Should it free the memory after saving
         :return: None
         """
+        if self.checkpoint_dir is None:
+            return
         self._model = model
         self._optimizer = optimizer
         # pickle the object
@@ -95,6 +101,8 @@ class CheckpointHandler:
 
     @staticmethod
     def load_checkpoint(checkpoint_dir: str, session_name: str, epoch: int | None = None):
+        if checkpoint_dir is None:
+            raise ValueError('Checkpoint directory is not set')
         checkpoint_dir = Path(checkpoint_dir)
         if not checkpoint_dir.exists():
             return None
