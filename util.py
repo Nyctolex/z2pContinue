@@ -1,6 +1,6 @@
 import time
 from pathlib import Path
-
+from enum import Enum
 import torch
 
 
@@ -117,3 +117,11 @@ def timer_factory():
             return f'{minutes}:{remaining_seconds} [min:sec]'
 
     return MyTimer
+
+
+class TrainingStrategy(Enum):
+    GRAYSCALE = 'GRAYSCALE'
+    OUTLINE = 'OUTLINE'
+    COLOR = 'COLOR'
+    def __str__(self):
+        return self.value
