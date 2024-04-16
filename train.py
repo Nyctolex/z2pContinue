@@ -115,7 +115,7 @@ class Trainer:
         else:
             model = self.get_new_model()
             optimizer = torch.optim.Adam(model.parameters(), lr=opts.lr)
-            checkpoint_handler = CheckpointHandler(str(opts.checkpoint_dir), session_name=opts.session_name)
+            checkpoint_handler = CheckpointHandler(opts.checkpoint_dir, session_name=opts.session_name)
             start_epoch = 0
         if opts.load_weights_path is not None:
             model.load_state_dict(torch.load(opts.load_weights_path))

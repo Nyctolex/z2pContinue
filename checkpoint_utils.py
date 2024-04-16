@@ -4,12 +4,12 @@ import pickle
 
 
 class CheckpointHandler:
-    def __init__(self, checkpoint_dir: str | None, session_name: str):
+    def __init__(self, checkpoint_dir: str | None | Path, session_name: str):
         if checkpoint_dir is None:
             self.checkpoint_dir = None
         else:
             assert isinstance(session_name, str)
-            assert isinstance(checkpoint_dir, str)
+            assert isinstance(checkpoint_dir, str) or isinstance(checkpoint_dir, Path)
 
             assert checkpoint_dir != '', 'Checkpoint directory cannot be empty'
             assert session_name != '', 'Session name cannot be empty'
