@@ -96,7 +96,9 @@ class Trainer:
             raise NotImplementedError('Training strategy not implemented')
         model = PosADANet(input_channels=input_channels, output_channels=output_channels, n_style=self.control_vector_length,
                           padding=opts.padding, bilinear=not opts.trans_conv,
-                          nfreq=opts.nfreq, magnitude=opts.freq_magnitude).to(self.device)
+                          nfreq=opts.nfreq, magnitude=opts.freq_magnitude, nof_layers = opts.nof_layers,
+                          style_enc_layers = opts.style_enc_layers, start_channels = opts.start_channels
+                          ).to(self.device)
         return model
 
     def load_checkpoint(self):
@@ -115,6 +117,8 @@ class Trainer:
             optimizer = torch.optim.Adam(model.parameters(), lr=opts.lr)
             checkpoint_handler = CheckpointHandler(str(opts.checkpoint_dir), session_name=opts.session_name)
             start_epoch = 0
+        if opts.load_weights_path is not None:
+            model.load_state_dict(torch.load(opts.load_weights_path))
         self.optimizer = optimizer
         self.model = model
         self.start_epoch = start_epoch
@@ -304,6 +308,10 @@ if __name__ == '__main__':
     parser.add_argument('--train_strategy', type=TrainingStrategy, choices=list(TrainingStrategy))
     parser.add_argument('--session_name', type=str, default='default')
 
+    parser.add_argument('--load_weights_path', type=str, default=None)
+    parser.add_argument('--nof_layers', type=int, default=4)
+    parser.add_argument('--style_enc_layers', type=int, default=6)
+    parser.add_argument('--start_channels', type=int, default=64)
     parser.add_argument('--batch_size', type=int)
     parser.add_argument('--test_batch_size', type=int, default=10)
     parser.add_argument('--num_workers', type=int)
