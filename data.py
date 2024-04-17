@@ -88,8 +88,10 @@ class Shape:
 
 
 class GenericDataset(Dataset):
-    def __init__(self, folder: Path,train_strategy:TrainingStrategy|None = None, keys=('colors', 'light_sph_relative'),
+    def __init__(self, folder: Path,train_strategy:TrainingStrategy, keys=('colors', 'light_sph_relative'),
                  splat_size=3, cache=True):
+        assert train_strategy in [TrainingStrategy.GRAYSCALE, TrainingStrategy.OUTLINE, TrainingStrategy.COLOR], \
+            "Invalid Training Strategy"
         self.folder = Path(folder)
         self.train_strategy = train_strategy
         self.splat_size = splat_size
@@ -145,11 +147,11 @@ class GenericDataset(Dataset):
         settings_vector = torch.cat(settings_vector)
         img, zbuffer = rtn
 
-        generate_outline = self.train_strategy == TrainingStrategy.OUTLINE or self.train_strategy is None
+        generate_outline = (self.train_strategy == TrainingStrategy.OUTLINE or self.train_strategy == TrainingStrategy.COLOR)
         if  generate_outline:
             t_lower = 2  # Lower Threshold
             t_upper = 50  # Upper threshold
-            outline = cv2.Canny(cv2.GaussianBlur(img, (5, 5), 0), t_lower, t_upper)
+            outline = cv2.Canny(cv2.GaussianBlur(img[:, :, :3], (5, 5), 0), t_lower, t_upper)
             outline = torch.from_numpy(outline)
             outline = outline.unsqueeze(0)
 
@@ -157,18 +159,19 @@ class GenericDataset(Dataset):
         img = img.permute(2, 0, 1) / 255
         zbuffer = torch.from_numpy(zbuffer)
         zbuffer = zbuffer.unsqueeze(0)
-        generate_grayscale = self.train_strategy == TrainingStrategy.GRAYSCALE or self.train_strategy is None
+        generate_grayscale = (self.train_strategy == TrainingStrategy.GRAYSCALE or self.train_strategy == TrainingStrategy.COLOR)
         if generate_grayscale:
             gray_scale = img[0:3, :, :].mean(axis=0)
             gray_scale = gray_scale.unsqueeze(0)
 
-        if generate_outline and generate_outline:
-            return str(img_path), img, outline,  zbuffer, settings_vector
+        if self.train_strategy == TrainingStrategy.COLOR:
+            return str(img_path), img, outline, gray_scale, settings_vector
         elif generate_grayscale:
             return str(img_path), img, gray_scale, zbuffer, settings_vector
         elif generate_outline:
             return str(img_path), img, outline, zbuffer, settings_vector
-        return str(img_path), img, outline, gray_scale, zbuffer, settings_vector
+        else:
+            raise ValueError("Invalid Training Strategy")
 
 
 def scatter(u_pix, v_pix, distances, res, radius=5, dr=(0, 0), const=6, scale_const=0.7):

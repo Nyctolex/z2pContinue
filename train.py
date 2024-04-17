@@ -160,7 +160,7 @@ class Trainer:
             settings_vector = parse_tensor(settings_vector)
             return img_paths, z_buffer, settings_vector, gray_scale
         elif self.train_strategy == TrainingStrategy.COLOR:
-            img_paths, img, outline, gray_scale, _, settings_vector = data
+            img_paths, img, outline, gray_scale, settings_vector = data
             img = parse_tensor(img)
             outline = parse_tensor(outline)
             gray_scale = parse_tensor(gray_scale)
@@ -168,13 +168,7 @@ class Trainer:
             return img_paths, img, outline, gray_scale, settings_vector
 
         else:
-            img_paths, img, outline, gray_scale, z_buffer, settings_vector = data
-            img = parse_tensor(img)
-            outline = parse_tensor(outline)
-            gray_scale = parse_tensor(gray_scale)
-            z_buffer = parse_tensor(z_buffer)
-            settings_vector = parse_tensor(settings_vector)
-            return img_paths, img, outline, gray_scale, z_buffer, settings_vector
+            raise NotImplementedError('Training strategy not implemented')
 
 
     def predict(self, data: tuple[str|torch.Tensor]):
@@ -189,8 +183,9 @@ class Trainer:
             img_paths, zbuffer, settings_vector, gray_scale = data
             return self.model(zbuffer, settings_vector), gray_scale
         elif self.train_strategy == TrainingStrategy.COLOR:
-            #TODO: add color training strategy
-            assert NotImplementedError('Training strategy not implemented')
+            img_paths, img, outline, gray_scale, settings_vector = data
+            input_data = torch.cat([gray_scale, outline], dim=1)
+            return self.model(input_data, settings_vector), img
         else:
             raise NotImplementedError('Training strategy not implemented')
 
@@ -210,21 +205,24 @@ class Trainer:
         if self.train_strategy == TrainingStrategy.OUTLINE:
             prediction = self.expand_dimensions(prediction)
             _, zbuffer, settings_vector, outline = data
-            target = self.expand_dimensions(outline)
-            source = self.expand_dimensions(zbuffer)
+            outline = self.expand_dimensions(outline)
+            zbuffer = self.expand_dimensions(zbuffer)
+            cat_img = torch.cat([outline, prediction, zbuffer], dim=2)
 
 
         elif self.train_strategy == TrainingStrategy.GRAYSCALE:
             prediction = self.expand_dimensions(prediction)
             _, zbuffer, settings_vector, gray_scale = data
-            target = self.expand_dimensions(gray_scale)
-            source = self.expand_dimensions(zbuffer)
+            gray_scale = self.expand_dimensions(gray_scale)
+            zbuffer = self.expand_dimensions(zbuffer)
+            cat_img = torch.cat([gray_scale, prediction, zbuffer], dim=2)
         elif self.train_strategy == TrainingStrategy.COLOR:
-            raise NotImplementedError('Training strategy not implemented')
+            _, img, outline, gray_scale, settings_vector = data
+            outline = self.expand_dimensions(outline)
+            gray_scale = self.expand_dimensions(gray_scale)
+            cat_img = torch.cat([outline, gray_scale, prediction, img], dim=2)
         else:
             raise NotImplementedError('Training strategy not implemented')
-
-        cat_img = torch.cat([target, prediction, source], dim=2)
         log_images(export_dir, f'train_imgs{iteration}', cat_img.detach(), settings_vector)
 
 
@@ -279,8 +277,8 @@ class Trainer:
                 self.log_images(data, prediction, i, self.test_export_dir)
             self.checkpoint_handler.add_seen_paths(img_paths)
 
-        logger.debug(f'average train loss: {self.checkpoint_handler.get_avg_train_loss()}')
-        logger.debug(f'average test loss: {self.checkpoint_handler.get_avg_test_loss()}')
+        logger.opt(colors=True).debug(f'<magenta>average train loss: {self.checkpoint_handler.get_avg_train_loss()} </magenta>')
+        logger.opt(colors=True).debug(f'<magenta>average test loss: {self.checkpoint_handler.get_avg_test_loss()}</magenta>')
 
 
     def train(self):
