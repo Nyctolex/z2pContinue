@@ -165,11 +165,11 @@ class GenericDataset(Dataset):
             gray_scale = gray_scale.unsqueeze(0)
 
         if self.train_strategy == TrainingStrategy.COLOR:
-            return str(img_path), img, outline, gray_scale, settings_vector
+            return str(z_buffer_path), img, outline, gray_scale, settings_vector
         elif generate_grayscale:
-            return str(img_path), img, gray_scale, zbuffer, settings_vector
+            return str(z_buffer_path), img, gray_scale, zbuffer, settings_vector
         elif generate_outline:
-            return str(img_path), img, outline, zbuffer, settings_vector
+            return str(z_buffer_path), img, outline, zbuffer, settings_vector
         else:
             raise ValueError("Invalid Training Strategy")
 

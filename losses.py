@@ -1,5 +1,9 @@
 from functools import cache
 from torchmetrics.functional.image import structural_similarity_index_measure
+import torch
+import numpy as np
+import skimage as ski
+import scipy.ndimage as ndimage
 
 
 def mse(generated, gt):
@@ -73,3 +77,17 @@ def background(generated, gt):
 
 def SSIM(generated, gt):
     return 1 - structural_similarity_index_measure(generated, gt, data_range =255)
+
+
+def weighted_cross_entropy_loss(generated, gt):
+    gt = gt/255
+    generated = torch.sigmoid(generated)
+    img = torch.Tensor.cpu(gt).detach().numpy()
+    weight = ndimage.gaussian_filter(img.astype(float), (0, 0, 1, 1)) + 4*ndimage.gaussian_filter(img.astype(float), (0, 0, 8, 8)) + 3*ndimage.gaussian_filter(img.astype(float), (0, 0, 16, 16)) + 2*ndimage.gaussian_filter(img.astype(float), (0, 0, 24, 24)) + ndimage.gaussian_filter(img.astype(float), (0, 0, 32, 32))
+    weight = np.clip(weight/np.amax(weight-15), 0, 1)
+    weight = np.maximum(img/255, weight)
+    weight = torch.tensor(weight).float().to(generated.device)
+    loss = - (1-weight) * (gt*torch.log(generated+1e-8) + (1-gt)*torch.log(1+1e-8-generated))
+    loss = loss.sum(dim=1)
+    loss = loss.sum() / (loss.shape[-1] * loss.shape[-2])
+    return loss
