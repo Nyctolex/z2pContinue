@@ -264,7 +264,7 @@ class Trainer:
                 logger.debug('saving checkpoint')
                 logger.debug(f'average train time: {sum_train_time / train_times_count} seconds per iteration')
                 self.checkpoint_handler.save_checkpoint(self.model, self.optimizer)
-            
+
             if self.checkpoint_handler.iteration % self.opts.lr_decay_iteration_cnt == self.opts.lr_decay_iteration_cnt-1:
                 self.test()
                 if (self.checkpoint_handler.iteration > self.opts.lr_decay_iteration_cnt):
@@ -281,10 +281,12 @@ class Trainer:
             if modulo_batch_size + curr_batch_size >= self.opts.batch_size:
                 self.checkpoint_handler.iteration += 1
             modulo_batch_size = (modulo_batch_size + curr_batch_size) % self.opts.batch_size
+            
+            
                     
 
     def test(self):
-        if self.checkpoint_handler.last_test_iteration == self.checkpoint_handler.iteration:
+        if self.checkpoint_handler.last_test_iteration > self.checkpoint_handler.iteration-5:
             return
         self.model.eval()
         self.checkpoint_handler.test()
@@ -337,16 +339,16 @@ if __name__ == '__main__':
     parser.add_argument('--style_enc_layers', type=int, default=6)
     parser.add_argument('--start_channels', type=int, default=64)
     parser.add_argument('--batch_size', type=int)
-    parser.add_argument('--test_batch_size', type=int, default=50)
+    parser.add_argument('--test_batch_size', type=int, default=75)
     parser.add_argument('--num_workers', type=int)
     parser.add_argument('--nfreq', type=int, default=20)
     parser.add_argument('--freq_magnitude', type=int, default=10)
     parser.add_argument('--log_iter', type=int, default=1000)
     parser.add_argument('--epochs', type=int)
     parser.add_argument('--lr', type=float, default=3e-4)
-    parser.add_argument('--lr_decay', type=float, default=0.2)
+    parser.add_argument('--lr_decay', type=float, default=0.5)
     parser.add_argument('--lr_decay_loss_thd', type=float, default=0.98)
-    parser.add_argument('--lr_decay_iteration_cnt', type=float, default=3000)
+    parser.add_argument('--lr_decay_iteration_cnt', type=float, default=4000)
     parser.add_argument('--losses', nargs='+', default=['mse', 'intensity', 'color_SSIM'])
     parser.add_argument('--l_weight', nargs='+', default=[1, 1, 0.5], type=float)
     parser.add_argument('--tb', action='store_true')
