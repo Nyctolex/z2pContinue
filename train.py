@@ -346,7 +346,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=3e-4)
     parser.add_argument('--lr_decay', type=float, default=0.2)
     parser.add_argument('--lr_decay_loss_thd', type=float, default=0.98)
-    parser.add_argument('--lr_decay_iteration_cnt', type=float, default=4000)
+    parser.add_argument('--lr_decay_iteration_cnt', type=float, default=3000)
     parser.add_argument('--losses', nargs='+', default=['mse', 'intensity', 'color_SSIM'])
     parser.add_argument('--l_weight', nargs='+', default=[1, 1, 0.5], type=float)
     parser.add_argument('--tb', action='store_true')
