@@ -66,12 +66,12 @@ class RunningAverage:
 
     def get_average(self):
         if self.count == 0:
-            return 0
+            return None
         return float(self.sum) / self.count
 
     def get_var(self):
         if self.count == 0:
-            return 0
+            return None
         return (float(self.squre) / self.count) - self.get_average() ** 2
 
 

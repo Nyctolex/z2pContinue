@@ -12,6 +12,7 @@ import util
 from models import PosADANet
 from util import TrainingStrategy
 from loguru import logger
+import numpy as np
 
 losses_funcs = {}
 for val in getmembers(losses):
@@ -111,6 +112,9 @@ class Trainer:
             start_epoch = checkpoint_handler.get_current_epoch()
             # free allocated memory
             checkpoint_handler.free_space()
+            checkpoint_handler._look_for_used_data = True
+            if not opts.scan_for_used_data:
+                checkpoint_handler._look_for_used_data = False
 
         else:
             model = self.get_new_model()
@@ -129,6 +133,7 @@ class Trainer:
     def start_train(self):
         self.model.train()
         self.checkpoint_handler.train()
+        self.checkpoint_handler.save_lr(self.opts.lr)
 
 
     def parse_data(self, data: tuple[str|torch.Tensor]) -> ((
@@ -229,12 +234,11 @@ class Trainer:
     def train_epoch(self, epoch: int):
         sum_train_time = 0
         train_times_count = 0
+        modulo_batch_size = 0
         for i, data  in enumerate(self.train_loader):
+            self.model.train()
             logger.debug(f'Epoch {epoch}   Iteration {i}/len{len(self.train_loader)}')
             start_time = time()
-            if self.checkpoint_handler.should_skip_training():
-                # If we paused in the testing phase, we should skip the training phase
-                break
             data = self.parse_data(data)
             if data is None:
                 continue
@@ -256,29 +260,50 @@ class Trainer:
             logger.debug(f'epoch: {epoch}; iter: {i}/{self.num_samples} loss: {loss}')
             sum_train_time += time() - start_time
             train_times_count += 1
-            if i % self.opts.checkpoint_every == 0:
+            if i % self.opts.checkpoint_every == self.opts.checkpoint_every-1:
                 logger.debug('saving checkpoint')
                 logger.debug(f'average train time: {sum_train_time / train_times_count} seconds per iteration')
                 self.checkpoint_handler.save_checkpoint(self.model, self.optimizer)
+            
+            if self.checkpoint_handler.iteration % self.opts.lr_decay_iteration_cnt == self.opts.lr_decay_iteration_cnt-1:
+                self.test()
+                if (self.checkpoint_handler.iteration > self.opts.lr_decay_iteration_cnt):
+                    relevant_history_map = np.array(self.checkpoint_handler.test_history_marker) <= (self.checkpoint_handler.iteration - self.opts.lr_decay_iteration_cnt)
+                    if self.checkpoint_handler.test_loss_history[-1] > np.array(self.checkpoint_handler.test_loss_history)[relevant_history_map][-1]*self.opts.lr_decay_loss_thd:
+                        for param_group in self.optimizer.param_groups:
+                            param_group['lr'] *= self.opts.lr_decay
+                            self.opts.lr = param_group['lr']
+                        logger.debug(f'decreasing learning rate to {self.opts.lr}')
+                        self.checkpoint_handler.save_lr(self.opts.lr)
+                        self.opts.lr_decay_loss_thd = 1 - (1 - self.opts.lr_decay_loss_thd)*self.opts.lr_decay
+                self.checkpoint_handler.plot_loss(save_path=str(self.export_dir)+'/loss.png')
+            curr_batch_size = len(img_paths)
+            if modulo_batch_size + curr_batch_size >= self.opts.batch_size:
+                self.checkpoint_handler.iteration += 1
+            modulo_batch_size = (modulo_batch_size + curr_batch_size) % self.opts.batch_size
+                    
 
     def test(self):
+        if self.checkpoint_handler.last_test_iteration == self.checkpoint_handler.iteration:
+            return
         self.model.eval()
         self.checkpoint_handler.test()
         self.checkpoint_handler.save_checkpoint(self.model, self.optimizer)
-        for i, data in enumerate(self.test_loader):
-            with torch.no_grad():
+        with torch.no_grad():
+            for i, data in enumerate(self.test_loader):
                 data = self.parse_data(data)
                 if data is None:
                     continue
                 prediction, target = self.predict(data)
-                img_paths = data[0]
                 test_loss = self.calc_loss(prediction, target)
                 self.checkpoint_handler.add_test_loss(test_loss.item())
                 self.log_images(data, prediction, i, self.test_export_dir)
-            self.checkpoint_handler.add_seen_paths(img_paths)
+            self.checkpoint_handler.save_average_loss()
 
-        logger.opt(colors=True).debug(f'<magenta>average train loss: {self.checkpoint_handler.get_avg_train_loss()} </magenta>')
-        logger.opt(colors=True).debug(f'<magenta>average test loss: {self.checkpoint_handler.get_avg_test_loss()}</magenta>')
+        logger.opt(colors=True).debug(f'<magenta>average train loss: {self.checkpoint_handler.train_loss_history[-1]} </magenta>')
+        logger.opt(colors=True).debug(f'<magenta>average test loss: {self.checkpoint_handler.test_loss_history[-1]}</magenta>')
+
+        self.checkpoint_handler.last_test_iteration = self.checkpoint_handler.iteration
 
 
     def train(self):
@@ -301,12 +326,13 @@ if __name__ == '__main__':
     parser.add_argument('--export_dir', type=Path)
     parser.add_argument('--test_data', type=Path)
     parser.add_argument('--checkpoint_dir', type=Path, default=None)
-    parser.add_argument('--checkpoint_every', type=int, default=50,
+    parser.add_argument('--checkpoint_every', type=int, default=500,
                         help='how often to save checkpoints (in iterations, not epochs)')
     parser.add_argument('--train_strategy', type=TrainingStrategy, choices=list(TrainingStrategy))
     parser.add_argument('--session_name', type=str, default='default')
 
     parser.add_argument('--load_weights_path', type=str, default=None)
+    parser.add_argument('--scan_for_used_data', type=bool, default=True)
     parser.add_argument('--nof_layers', type=int, default=4)
     parser.add_argument('--style_enc_layers', type=int, default=6)
     parser.add_argument('--start_channels', type=int, default=64)
@@ -318,7 +344,10 @@ if __name__ == '__main__':
     parser.add_argument('--log_iter', type=int, default=1000)
     parser.add_argument('--epochs', type=int)
     parser.add_argument('--lr', type=float, default=3e-4)
-    parser.add_argument('--losses', nargs='+', default=['mse', 'intensity', 'SIMM'])
+    parser.add_argument('--lr_decay', type=float, default=0.2)
+    parser.add_argument('--lr_decay_loss_thd', type=float, default=0.98)
+    parser.add_argument('--lr_decay_iteration_cnt', type=float, default=4000)
+    parser.add_argument('--losses', nargs='+', default=['mse', 'intensity', 'color_SSIM'])
     parser.add_argument('--l_weight', nargs='+', default=[1, 1, 0.5], type=float)
     parser.add_argument('--tb', action='store_true')
     parser.add_argument('--padding', default='zeros', type=str)

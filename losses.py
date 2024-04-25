@@ -1,5 +1,5 @@
 from functools import cache
-from torchmetrics.functional.image import structural_similarity_index_measure
+from torchmetrics.functional.image import multiscale_structural_similarity_index_measure
 import torch
 import numpy as np
 import skimage as ski
@@ -76,7 +76,11 @@ def background(generated, gt):
 
 
 def SSIM(generated, gt):
-    return 1 - structural_similarity_index_measure(generated, gt, data_range =255)
+    return 1 - multiscale_structural_similarity_index_measure(generated, gt, data_range =1.0)
+
+
+def color_SSIM(generated, gt):
+    return 1 - multiscale_structural_similarity_index_measure(generated[:, :3, :, :], gt[:, :3, :, :], data_range =1.0)
 
 
 def weighted_cross_entropy_loss(generated, gt):

@@ -1,6 +1,8 @@
 from util import RunningAverage
 from pathlib import Path
 import pickle
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 class CheckpointHandler:
@@ -21,14 +23,21 @@ class CheckpointHandler:
         self._running_train_loss = RunningAverage()
         self._running_test_loss = RunningAverage()
         self._epoch = 0
+        self.iteration = 0
         self.train_loss_history = []
         self.test_loss_history = []
+        self.train_history_marker = []
+        self.test_history_marker = []
+        self.lr_history = []
+        self.lr_history_marker = []
         self._training_phase = True
         self._skip_training = False
         self._hyperparameters = {}
         self._session_name = session_name
         self._model = None
         self._optimizer = None
+        self._look_for_used_data = False
+        self.last_test_iteration = 0
 
     def should_skip_training(self):
         if self._skip_training:
@@ -66,6 +75,8 @@ class CheckpointHandler:
         return path in self.datapoint_paths
 
     def get_unseen_points(self, paths: str) -> list[bool]:
+        if not self._look_for_used_data:
+            return [True]*len(paths)
         return [not self.already_seen(p) for p in paths]
 
     def add_train_loss(self, loss: float):
@@ -79,6 +90,22 @@ class CheckpointHandler:
 
     def get_avg_train_loss(self):
         return self._running_train_loss.get_average()
+        
+    def save_average_loss(self):
+        train_loss = self.get_avg_train_loss()
+        if train_loss is not None:
+            self.train_loss_history.append(train_loss)
+            self.train_history_marker.append(self.iteration)
+        test_loss = self.get_avg_test_loss()
+        if test_loss is not None:
+            self.test_loss_history.append(test_loss)
+            self.test_history_marker.append(self.iteration)
+        self._running_train_loss.reset()
+        self._running_test_loss.reset()
+
+    def save_lr(self, lr: float):
+        self.lr_history.append(lr)
+        self.lr_history_marker.append(self.iteration)
 
     def save_checkpoint(self, model, optimizer, free_space=True):
         """
@@ -92,6 +119,7 @@ class CheckpointHandler:
             return
         self._model = model
         self._optimizer = optimizer
+        self.save_average_loss()
         # pickle the object
         file_name = f'{self._session_name}_checkpoint_epoch_{self._epoch}.pkl'
         file_path = self.checkpoint_dir / file_name
@@ -149,10 +177,23 @@ class CheckpointHandler:
     def get_current_epoch(self):
         return self._epoch
 
+
     def end_epoch(self):
         self.datapoint_paths = set()
-        self._running_train_loss.reset()
-        self._running_test_loss.reset()
-        self.train_loss_history.append(self.get_avg_train_loss())
-        self.test_loss_history.append(self.get_avg_test_loss())
         self._epoch += 1
+        self._look_for_used_data = False
+
+
+    def plot_loss(self, save_path: str | None = None):
+        plt.plot(self.train_history_marker, self.train_loss_history, label='Train Loss')
+        plt.plot(self.test_history_marker, self.test_loss_history, label='Test Loss')
+        plt.title('Loss over iterations')
+        for i, lr in enumerate(self.lr_history):
+            plt.text(self.lr_history_marker[i], self.test_loss_history[-1], format(lr, '.2E'))
+            plt.axvline(x = self.lr_history_marker[i], color = 'b', linewidth=1)
+        plt.xlabel('Iteration')
+        plt.ylabel('Loss')
+        plt.legend()
+        if save_path is not None:
+            plt.savefig(save_path)
+        plt.close()
