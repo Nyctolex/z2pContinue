@@ -87,11 +87,32 @@ class Shape:
         return self.views[view_index] / f'render.png', self.views[view_index] / f'{item_index}.npy'
 
 
+def get_settings_vector(settings_dict, keys):
+    settings_vector = []
+    for k in keys:
+        if isinstance(settings_dict[k], float):
+            attr = torch.tensor([settings_dict[k]])
+        else:
+            attr = torch.from_numpy(settings_dict[k])
+        if k == 'colors':
+            attr = torch.flip(attr, [0])
+        settings_vector.append(attr)
+    return torch.cat(settings_vector)
+
+def get_image_as_tensor(img_path: Path):
+    img = cv2.imread(str(img_path), cv2.IMREAD_UNCHANGED)
+    img = resize(img)
+    img = torch.from_numpy(img)
+    if len(img.shape) == 2:
+        img = img.unsqueeze(2)
+    img = img.permute(2, 0, 1) / 255
+    return img
+
+
 class GenericDataset(Dataset):
     def __init__(self, folder: Path,train_strategy:TrainingStrategy, keys=('colors', 'light_sph_relative'),
                  splat_size=3, cache=True):
-        assert train_strategy in [TrainingStrategy.GRAYSCALE, TrainingStrategy.OUTLINE, TrainingStrategy.COLOR], \
-            "Invalid Training Strategy"
+        assert train_strategy in list(TrainingStrategy), "Invalid Training Strategy"
         self.folder = Path(folder)
         self.train_strategy = train_strategy
         self.splat_size = splat_size
@@ -132,22 +153,11 @@ class GenericDataset(Dataset):
 
         settings_path = img_path.parent / 'settings.npy'
         settings_dict = np.load(settings_path, allow_pickle=True).item()
+        settings_vector = get_settings_vector(settings_dict, self.keys)
 
-        settings_vector = []
-        for k in self.keys:
-            if isinstance(settings_dict[k], float):
-                attr = torch.tensor([settings_dict[k]])
-            else:
-                attr = torch.from_numpy(settings_dict[k])
-
-            if k == 'colors':
-                attr = torch.flip(attr, [0])
-            settings_vector.append(attr)
-
-        settings_vector = torch.cat(settings_vector)
         img, zbuffer = rtn
-
-        generate_outline = (self.train_strategy == TrainingStrategy.OUTLINE or self.train_strategy == TrainingStrategy.COLOR)
+        generate_outline_strategies = [TrainingStrategy.ALL, TrainingStrategy.OUTLINE, TrainingStrategy.COLOR]
+        generate_outline = self.train_strategy in generate_outline_strategies
         if  generate_outline:
             t_lower = 2  # Lower Threshold
             t_upper = 50  # Upper threshold
@@ -159,19 +169,55 @@ class GenericDataset(Dataset):
         img = img.permute(2, 0, 1) / 255
         zbuffer = torch.from_numpy(zbuffer)
         zbuffer = zbuffer.unsqueeze(0)
-        generate_grayscale = (self.train_strategy == TrainingStrategy.GRAYSCALE or self.train_strategy == TrainingStrategy.COLOR)
+        generate_grayscale_strategies = [TrainingStrategy.ALL, TrainingStrategy.GRAYSCALE, TrainingStrategy.COLOR]
+        generate_grayscale = self.train_strategy in generate_grayscale_strategies
         if generate_grayscale:
             gray_scale = img[0:3, :, :].mean(axis=0)
             gray_scale = gray_scale.unsqueeze(0)
 
         if self.train_strategy == TrainingStrategy.COLOR:
             return str(z_buffer_path), img, outline, gray_scale, settings_vector
-        elif generate_grayscale:
+        elif self.train_strategy == TrainingStrategy.GRAYSCALE:
             return str(z_buffer_path), img, gray_scale, zbuffer, settings_vector
-        elif generate_outline:
+        elif self.train_strategy == TrainingStrategy.OUTLINE:
             return str(z_buffer_path), img, outline, zbuffer, settings_vector
+        elif self.train_strategy == TrainingStrategy.ALL:
+            return str(z_buffer_path), img, outline, gray_scale, zbuffer, settings_dict
         else:
             raise ValueError("Invalid Training Strategy")
+
+
+class ColorDataset(Dataset):
+    def __init__(self, folder: Path, keys=('colors', 'light_sph_relative')):
+        assert folder.exists(), f'{folder} does not exist'
+        self.folder = folder
+        self.folders = list(self.folder.iterdir())
+        self.folders = {int(f.name) for f in self.folders}
+        self.keys = keys
+
+    def __len__(self):
+        return len(self.folders)
+
+
+    def __getitem__(self, index: int):
+        """
+        :param index:
+        :return: :return: (string, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor)
+        target_image (NXMX3), z_buffer (NXM)
+        """
+        assert index in self.folders, f'{index} not in dataset'
+        img_path = self.folder /  str(index) / 'img.png'
+        gray_path = self.folder / str(index) / 'gray_img.png'
+        outline_path = self.folder / str(index) / 'outline_img.png'
+        settings_path = self.folder / str(index) / 'settings.npy'
+
+        img = get_image_as_tensor(img_path)
+        gray = get_image_as_tensor(gray_path)
+        outline = get_image_as_tensor(outline_path)
+
+        settings = np.load(str(settings_path), allow_pickle=True).item()
+        settings_vector = get_settings_vector(settings, self.keys)
+        return img, outline, gray, settings_vector
 
 
 def scatter(u_pix, v_pix, distances, res, radius=5, dr=(0, 0), const=6, scale_const=0.7):
@@ -242,3 +288,5 @@ def load_files(png_path, npy_path, splat_size=5, cache=True, dr=(0, 0)):
         return img, z_buffer
     else:
         return z_buffer
+
+
