@@ -123,5 +123,6 @@ class TrainingStrategy(Enum):
     GRAYSCALE = 'GRAYSCALE'
     OUTLINE = 'OUTLINE'
     COLOR = 'COLOR'
+    ALL = 'ALL'
     def __str__(self):
         return self.value
