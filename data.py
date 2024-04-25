@@ -87,11 +87,31 @@ class Shape:
         return self.views[view_index] / f'render.png', self.views[view_index] / f'{item_index}.npy'
 
 
+def get_settings_vector(settings_dict, keys):
+    settings_vector = []
+    for k in keys:
+        if isinstance(settings_dict[k], float):
+            attr = torch.tensor([settings_dict[k]])
+        else:
+            attr = torch.from_numpy(settings_dict[k])
+        if k == 'colors':
+            attr = torch.flip(attr, [0])
+        settings_vector.append(attr)
+    return torch.cat(settings_vector)
+
+def get_image_as_tensor(img):
+    img = resize(img)
+    img = torch.from_numpy(img)
+    if len(img.shape) == 2:
+        img = img.unsqueeze(2)
+    img = img.permute(2, 0, 1) / 255
+    return img
+
+
 class GenericDataset(Dataset):
     def __init__(self, folder: Path,train_strategy:TrainingStrategy, keys=('colors', 'light_sph_relative'),
                  splat_size=3, cache=True):
-        assert train_strategy in [TrainingStrategy.GRAYSCALE, TrainingStrategy.OUTLINE, TrainingStrategy.COLOR], \
-            "Invalid Training Strategy"
+        assert train_strategy in list(TrainingStrategy), "Invalid Training Strategy"
         self.folder = Path(folder)
         self.train_strategy = train_strategy
         self.splat_size = splat_size
@@ -132,22 +152,11 @@ class GenericDataset(Dataset):
 
         settings_path = img_path.parent / 'settings.npy'
         settings_dict = np.load(settings_path, allow_pickle=True).item()
+        settings_vector = get_settings_vector(settings_dict, self.keys)
 
-        settings_vector = []
-        for k in self.keys:
-            if isinstance(settings_dict[k], float):
-                attr = torch.tensor([settings_dict[k]])
-            else:
-                attr = torch.from_numpy(settings_dict[k])
-
-            if k == 'colors':
-                attr = torch.flip(attr, [0])
-            settings_vector.append(attr)
-
-        settings_vector = torch.cat(settings_vector)
         img, zbuffer = rtn
-
-        generate_outline = (self.train_strategy == TrainingStrategy.OUTLINE or self.train_strategy == TrainingStrategy.COLOR)
+        generate_outline_strategies = [TrainingStrategy.ALL, TrainingStrategy.OUTLINE, TrainingStrategy.COLOR]
+        generate_outline = self.train_strategy in generate_outline_strategies
         if  generate_outline:
             t_lower = 2  # Lower Threshold
             t_upper = 50  # Upper threshold
@@ -159,19 +168,139 @@ class GenericDataset(Dataset):
         img = img.permute(2, 0, 1) / 255
         zbuffer = torch.from_numpy(zbuffer)
         zbuffer = zbuffer.unsqueeze(0)
-        generate_grayscale = (self.train_strategy == TrainingStrategy.GRAYSCALE or self.train_strategy == TrainingStrategy.COLOR)
+        generate_grayscale_strategies = [TrainingStrategy.ALL, TrainingStrategy.GRAYSCALE, TrainingStrategy.COLOR]
+        generate_grayscale = self.train_strategy in generate_grayscale_strategies
         if generate_grayscale:
             gray_scale = img[0:3, :, :].mean(axis=0)
             gray_scale = gray_scale.unsqueeze(0)
 
         if self.train_strategy == TrainingStrategy.COLOR:
             return str(z_buffer_path), img, outline, gray_scale, settings_vector
-        elif generate_grayscale:
+        elif self.train_strategy == TrainingStrategy.GRAYSCALE:
             return str(z_buffer_path), img, gray_scale, zbuffer, settings_vector
-        elif generate_outline:
+        elif self.train_strategy == TrainingStrategy.OUTLINE:
             return str(z_buffer_path), img, outline, zbuffer, settings_vector
+        elif self.train_strategy == TrainingStrategy.ALL:
+            return img, outline, gray_scale, zbuffer, settings_dict, img_path, z_buffer_path
         else:
             raise ValueError("Invalid Training Strategy")
+
+
+
+
+class ViewFolder:
+    def __init__(self, folder):
+        self.folder = Path(folder)
+        self._len = -1
+
+    def get_num_points(self):
+        if self._len != -1:
+            return self._len
+        files = list(self.folder.iterdir())
+        files = [f for f in files if f.name.endswith('.png') and f.name.startswith('gray_img')]
+        self._len = len(files)
+        return self._len
+
+    def __len__(self):
+        # This returns the total number of examples for all views
+        return self.get_num_points()
+
+    def get_render_img_path(self):
+        return self.folder / 'render.png'
+
+    def get_settings_path(self):
+        return self.folder / 'settings.npy'
+
+    def get_gray_img_path(self, index):
+        return self.folder / f'gray_img{index}.png'
+
+    def get_outline_img_path(self, index):
+        return self.folder / f'outline_img{index}.png'
+
+    def get_render_img(self):
+        return cv2.imread(str(self.get_render_img_path()), cv2.IMREAD_UNCHANGED)
+
+    def get_settings(self):
+        return np.load(self.get_settings_path(), allow_pickle=True).item()
+
+    def get_gray_img(self, index):
+        return cv2.imread(str(self.get_gray_img_path(index)), cv2.IMREAD_UNCHANGED)
+
+    def get_outline_img(self, index):
+        return cv2.imread(str(self.get_outline_img_path(index)), cv2.IMREAD_UNCHANGED)
+
+
+class ColorDatasetShape:
+
+    def __init__(self, folder):
+        self.folder = Path(folder)
+        self.views = []
+        self.counts = []
+
+        # find views
+        for f in self.folder.iterdir():
+            if f.name.startswith('view_'):
+                view = ViewFolder(f)
+                # if there are examples for this view add the it to shapes valid views
+                datapoints_count = len(view)
+                if datapoints_count > 0:
+                    self.views.append(view)
+                    self.counts.append(datapoints_count)
+
+        # Map the examples per view to a global index
+        self.inverter = BinMapper(self.counts)
+
+    def __len__(self):
+        # This returns the total number of examples for all views
+        return len(self.inverter)
+
+    def __getitem__(self, item):
+        # map between global index to a specific example in a specific view
+        view_index, item_index = self.inverter[item]
+        render =  self.views[view_index].get_render_img()
+        gray_img = self.views[view_index].get_gray_img(item_index)
+        outline_img = self.views[view_index].get_outline_img(item_index)
+        settings = self.views[view_index].get_settings()
+        return render, gray_img, outline_img, settings
+
+class ColorDataset(Dataset):
+    def __init__(self, folder: Path, keys=('colors', 'light_sph_relative')):
+        if isinstance(folder, str):
+            folder = Path(folder)
+        assert folder.exists(), f'{folder} does not exist'
+        self.folder = folder
+        self.shapes_paths = list(self.folder.iterdir())
+        self.shapes = []
+        # self.cache = cache
+        # read all shapes with positive amount of views
+        for s in self.shapes_paths:
+            if not os.path.isdir(s):
+                continue
+            shape = ColorDatasetShape(s)
+            if len(shape) > 0:
+                self.shapes.append(shape)
+
+        self.inverter = BinMapper([len(x) for x in self.shapes])
+        self.keys = keys
+
+    def __len__(self):
+        return len(self.inverter)
+
+
+    def __getitem__(self, index: int):
+        """
+        :param index:
+        :return: :return: (string, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor)
+        target_image (NXMX3), z_buffer (NXM)
+        """
+        shape_index, item_index = self.inverter[index]
+        render, gray_img, outline_img, settings = self.shapes[shape_index][item_index]
+
+        img = get_image_as_tensor(render)
+        gray_img = get_image_as_tensor(gray_img)
+        outline_img = get_image_as_tensor(outline_img)
+        settings_vector = get_settings_vector(settings, self.keys)
+        return img, gray_img, outline_img , settings_vector
 
 
 def scatter(u_pix, v_pix, distances, res, radius=5, dr=(0, 0), const=6, scale_const=0.7):
