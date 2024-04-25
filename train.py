@@ -337,7 +337,7 @@ if __name__ == '__main__':
     parser.add_argument('--style_enc_layers', type=int, default=6)
     parser.add_argument('--start_channels', type=int, default=64)
     parser.add_argument('--batch_size', type=int)
-    parser.add_argument('--test_batch_size', type=int, default=10)
+    parser.add_argument('--test_batch_size', type=int, default=50)
     parser.add_argument('--num_workers', type=int)
     parser.add_argument('--nfreq', type=int, default=20)
     parser.add_argument('--freq_magnitude', type=int, default=10)
