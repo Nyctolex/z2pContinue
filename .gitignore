@@ -9,7 +9,7 @@ datasets*
 *.ipynb_checkpoints
 *.pkl
 
-draft*.ipynb
+draft*
 
 */.DS_Store
 logs/*
