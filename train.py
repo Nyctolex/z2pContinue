@@ -3,6 +3,7 @@ from inspect import getmembers, isfunction
 from pathlib import Path
 from time import time
 import cv2 as cv
+import loguru
 import torch
 from torch.utils.data import DataLoader
 from checkpoint_utils import CheckpointHandler
@@ -357,5 +358,10 @@ if __name__ == '__main__':
     parser.add_argument('--cache', action='store_true')
     parser.add_argument('--splat_size', type=int)
     parser.add_argument('--controls', nargs='+', default=['colors', 'light_sph_relative'])
+    opts = parser.parse_args()
+    logger_path =  opts.export_dir/ (opts.session_name +".log")
+    logger.remove()
+    print(f'logging to {logger_path}')
+    logger.add(logger_path, level="DEBUG", diagnose=True)
 
-    train(parser.parse_args())
+    train(opts)
