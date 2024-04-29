@@ -8,7 +8,7 @@ datasets*
 *.idea
 *.ipynb_checkpoints
 *.pkl
-
+*.log
 draft*
 
 */.DS_Store
