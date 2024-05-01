@@ -134,7 +134,8 @@ class Trainer:
     def start_train(self):
         self.model.train()
         self.checkpoint_handler.train()
-        self.checkpoint_handler.save_lr(self.opts.lr)
+        if self.checkpoint_handler.iteration == 0:
+            self.checkpoint_handler.save_lr(self.opts.lr)
 
 
     def parse_data(self, data: tuple[str|torch.Tensor]) -> ((
