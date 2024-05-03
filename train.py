@@ -123,7 +123,7 @@ class Trainer:
             checkpoint_handler = CheckpointHandler(opts.checkpoint_dir, session_name=opts.session_name)
             start_epoch = 0
         if opts.load_weights_path is not None:
-            model.load_state_dict(torch.load(opts.load_weights_path))
+            model.load_state_dict(torch.load(opts.load_weights_path, map_location="cpu"))
         self.optimizer = optimizer
         self.model = model
         self.start_epoch = start_epoch
@@ -210,6 +210,7 @@ class Trainer:
     def log_images(self, data: tuple, prediction: torch.Tensor, iteration: int, export_dir: Path):
 
         if self.train_strategy == TrainingStrategy.OUTLINE:
+            prediction = torch.sigmoid(prediction)
             prediction = self.expand_dimensions(prediction)
             _, zbuffer, settings_vector, outline = data
             outline = self.expand_dimensions(outline)
