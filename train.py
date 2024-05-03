@@ -119,7 +119,7 @@ class Trainer:
 
         else:
             model = self.get_new_model()
-            optimizer = torch.optim.Adam(model.parameters(), lr=opts.lr)
+            optimizer = torch.optim.Adam(model.parameters(), lr=opts.lr, weight_decay=opts.weight_decay)
             checkpoint_handler = CheckpointHandler(opts.checkpoint_dir, session_name=opts.session_name)
             start_epoch = 0
         if opts.load_weights_path is not None:
@@ -354,6 +354,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr_decay_iteration_cnt', type=float, default=4000)
     parser.add_argument('--losses', nargs='+', default=['mse', 'intensity', 'color_SSIM'])
     parser.add_argument('--l_weight', nargs='+', default=[1, 1, 0.5], type=float)
+    parser.add_argument('--weight_decay', type=float, default=0)
     parser.add_argument('--tb', action='store_true')
     parser.add_argument('--padding', default='zeros', type=str)
     parser.add_argument('--trans_conv', action='store_true')
