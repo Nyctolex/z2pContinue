@@ -124,6 +124,8 @@ class Trainer:
             start_epoch = 0
         if opts.load_weights_path is not None:
             model.load_state_dict(torch.load(opts.load_weights_path, map_location="cpu"))
+        if opts.gradient_descent:
+            optimizer = torch.optim.SGD(model.parameters(), lr=opts.lr, weight_decay=opts.weight_decay)
         self.optimizer = optimizer
         self.model = model
         self.start_epoch = start_epoch
@@ -355,6 +357,7 @@ if __name__ == '__main__':
     parser.add_argument('--losses', nargs='+', default=['mse', 'intensity', 'color_SSIM'])
     parser.add_argument('--l_weight', nargs='+', default=[1, 1, 0.5], type=float)
     parser.add_argument('--weight_decay', type=float, default=0)
+    parser.add_argument('--gradient_descent', type=bool, default=False)
     parser.add_argument('--tb', action='store_true')
     parser.add_argument('--padding', default='zeros', type=str)
     parser.add_argument('--trans_conv', action='store_true')
