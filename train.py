@@ -119,11 +119,13 @@ class Trainer:
 
         else:
             model = self.get_new_model()
-            optimizer = torch.optim.Adam(model.parameters(), lr=opts.lr)
+            optimizer = torch.optim.Adam(model.parameters(), lr=opts.lr, weight_decay=opts.weight_decay)
             checkpoint_handler = CheckpointHandler(opts.checkpoint_dir, session_name=opts.session_name)
             start_epoch = 0
         if opts.load_weights_path is not None:
-            model.load_state_dict(torch.load(opts.load_weights_path))
+            model.load_state_dict(torch.load(opts.load_weights_path, map_location="cpu"))
+        if opts.gradient_descent:
+            optimizer = torch.optim.SGD(model.parameters(), lr=opts.lr, weight_decay=opts.weight_decay)
         self.optimizer = optimizer
         self.model = model
         self.start_epoch = start_epoch
@@ -134,7 +136,8 @@ class Trainer:
     def start_train(self):
         self.model.train()
         self.checkpoint_handler.train()
-        self.checkpoint_handler.save_lr(self.opts.lr)
+        if self.checkpoint_handler.iteration == 0:
+            self.checkpoint_handler.save_lr(self.opts.lr)
 
 
     def parse_data(self, data: tuple[str|torch.Tensor]) -> ((
@@ -209,6 +212,7 @@ class Trainer:
     def log_images(self, data: tuple, prediction: torch.Tensor, iteration: int, export_dir: Path):
 
         if self.train_strategy == TrainingStrategy.OUTLINE:
+            prediction = torch.sigmoid(prediction)
             prediction = self.expand_dimensions(prediction)
             _, zbuffer, settings_vector, outline = data
             outline = self.expand_dimensions(outline)
@@ -352,6 +356,8 @@ if __name__ == '__main__':
     parser.add_argument('--lr_decay_iteration_cnt', type=float, default=4000)
     parser.add_argument('--losses', nargs='+', default=['mse', 'intensity', 'color_SSIM'])
     parser.add_argument('--l_weight', nargs='+', default=[1, 1, 0.5], type=float)
+    parser.add_argument('--weight_decay', type=float, default=0)
+    parser.add_argument('--gradient_descent', type=bool, default=False)
     parser.add_argument('--tb', action='store_true')
     parser.add_argument('--padding', default='zeros', type=str)
     parser.add_argument('--trans_conv', action='store_true')
