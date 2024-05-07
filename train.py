@@ -369,5 +369,7 @@ if __name__ == '__main__':
     logger.remove()
     print(f'logging to {logger_path}')
     logger.add(logger_path, level="DEBUG", diagnose=True)
+    for arg in vars(opts):
+        logger.debug(f'{arg}, {getattr(opts, arg)}')
 
     train(opts)
