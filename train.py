@@ -339,7 +339,7 @@ if __name__ == '__main__':
     parser.add_argument('--session_name', type=str, default='default')
 
     parser.add_argument('--load_weights_path', type=str, default=None)
-    parser.add_argument('--scan_for_used_data', type=bool, default=True)
+    parser.add_argument('--scan_for_used_data', default=False, action="store_true")
     parser.add_argument('--nof_layers', type=int, default=4)
     parser.add_argument('--style_enc_layers', type=int, default=6)
     parser.add_argument('--start_channels', type=int, default=64)
@@ -357,7 +357,7 @@ if __name__ == '__main__':
     parser.add_argument('--losses', nargs='+', default=['mse', 'intensity', 'color_SSIM'])
     parser.add_argument('--l_weight', nargs='+', default=[1, 1, 0.5], type=float)
     parser.add_argument('--weight_decay', type=float, default=0)
-    parser.add_argument('--gradient_descent', type=bool, default=False)
+    parser.add_argument('--gradient_descent', default=False, action="store_true")
     parser.add_argument('--tb', action='store_true')
     parser.add_argument('--padding', default='zeros', type=str)
     parser.add_argument('--trans_conv', action='store_true')
