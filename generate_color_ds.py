@@ -33,7 +33,7 @@ def generate_color_dataset(source_dataset_path: Path, target_dataset_path: Path,
     outline_model.eval()
 
     vector_parse = lambda x: torch.tensor(x, dtype=torch.float32).to(device).unsqueeze(0)
-    for i in len(sample_set):
+    for i in range(len(sample_set)):
         datapoint = sample_set[i]
         img, _, _, zbuffer, settings_dict, img_path, z_buffer_path = datapoint
         model_name = img_path.parent.parent.name
@@ -82,7 +82,6 @@ if __name__ == '__main__':
     parser.add_argument('--outline_controls', nargs='+', default=['colors', 'light_sph_relative'])
     parser.add_argument('--grayscale_pickle_path', type=Path)
     parser.add_argument('--outline_pickle_path', type=Path)
-    parser.add_argument('--splat_size', type=int)  #TODO diffarent splant size
     parser.add_argument('--grayscale_splat_size', type=int)
     parser.add_argument('--outline_splat_size', type=int)
 
@@ -94,5 +93,7 @@ if __name__ == '__main__':
         outline_model=outline_model, grayscale_splat_size = opts.grayscale_splat_size,
                            outline_splat_size= opts.outline_splat_size, grayscale_keys = opts.grayscale_controls,
                             outline_keys = opts.outline_controls)
-    # ds = ColorDataset(opts.export_dir)
-    # print(len(ds))
+    ds = ColorDataset(opts.data_dir)
+    #print(len(ds))
+    #for x in ds:
+    #    pass

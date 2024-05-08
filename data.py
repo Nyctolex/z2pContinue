@@ -283,6 +283,10 @@ class ColorDataset(Dataset):
         self.inverter = BinMapper([len(x) for x in self.shapes])
         self.keys = keys
 
+    def control_length(self):
+        settings = self[0][-1]
+        return settings.shape[0]
+
     def __len__(self):
         return len(self.inverter)
 
