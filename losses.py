@@ -91,7 +91,7 @@ def weighted_cross_entropy_loss(generated, gt):
     weight = np.clip(weight/np.amax(weight-15), 0, 1)
     weight = np.maximum(img/255, weight)
     weight = torch.tensor(weight).float().to(generated.device)
-    loss = - ((1-weight)*(1-gt)*torch.log(1+1e-12-generated) + gt*torch.log(generated+1e-12))
+    loss = - ((1-weight)*(1-gt)*torch.log(1+1e-12-generated) + 1.5*gt*torch.log(generated+1e-12))
     loss = loss.sum(dim=1)
     loss = loss.sum() / (loss.shape[-1] * loss.shape[-2])
     return loss
