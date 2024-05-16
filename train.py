@@ -174,12 +174,12 @@ class Trainer:
             settings_vector = parse_tensor(settings_vector)
             return img_paths, z_buffer, settings_vector, gray_scale
         elif self.train_strategy == TrainingStrategy.COLOR:
-            img, gray_img, outline_img , settings_vector = data
+            img_path, img, gray_img, outline_img , settings_vector = data
             img = parse_tensor(img)
             gray_img = parse_tensor(gray_img)
             outline_img = parse_tensor(outline_img)
             settings_vector = parse_tensor(settings_vector)
-            return img, gray_img, outline_img , settings_vector
+            return img_path, img, gray_img, outline_img , settings_vector
 
         else:
             raise NotImplementedError('Training strategy not implemented')
@@ -197,7 +197,7 @@ class Trainer:
             img_paths, zbuffer, settings_vector, gray_scale = data
             return self.model(zbuffer, settings_vector), gray_scale
         elif self.train_strategy == TrainingStrategy.COLOR:
-            img, gray_img, outline_img , settings_vector = data
+            _, img, gray_img, outline_img , settings_vector = data
             input_data = torch.cat([gray_img, outline_img], dim=1)
             return self.model(input_data, settings_vector), img
         else:
@@ -232,7 +232,7 @@ class Trainer:
             zbuffer = self.expand_dimensions(zbuffer)
             cat_img = torch.cat([gray_scale, prediction, zbuffer], dim=2)
         elif self.train_strategy == TrainingStrategy.COLOR:
-            img, gray_img, outline_img , settings_vector = data
+            _, img, gray_img, outline_img , settings_vector = data
             outline_img = self.expand_dimensions(outline_img)
             gray_img = self.expand_dimensions(gray_img)
             cat_img = torch.cat([outline_img, gray_img, prediction, img], dim=2)
@@ -374,5 +374,7 @@ if __name__ == '__main__':
     logger.remove()
     print(f'logging to {logger_path}')
     logger.add(logger_path, level="DEBUG", diagnose=True)
+    for arg in vars(opts):
+        logger.debug(f'{arg}, {getattr(opts, arg)}')
 
     train(opts)

@@ -261,7 +261,8 @@ class ColorDatasetShape:
         gray_img = self.views[view_index].get_gray_img(item_index)
         outline_img = self.views[view_index].get_outline_img(item_index)
         settings = self.views[view_index].get_settings()
-        return render, gray_img, outline_img, settings
+        img_path = str(self.views[view_index].get_render_img_path())
+        return img_path, render, gray_img, outline_img, settings
 
 class ColorDataset(Dataset):
     def __init__(self, folder: Path, keys=('colors', 'light_sph_relative')):
@@ -298,13 +299,13 @@ class ColorDataset(Dataset):
         target_image (NXMX3), z_buffer (NXM)
         """
         shape_index, item_index = self.inverter[index]
-        render, gray_img, outline_img, settings = self.shapes[shape_index][item_index]
+        img_path, render, gray_img, outline_img, settings = self.shapes[shape_index][item_index]
 
         img = get_image_as_tensor(render)
         gray_img = get_image_as_tensor(gray_img)
         outline_img = get_image_as_tensor(outline_img)
         settings_vector = get_settings_vector(settings, self.keys)
-        return img, gray_img, outline_img , settings_vector
+        return img_path, img, gray_img, outline_img , settings_vector
 
 
 def scatter(u_pix, v_pix, distances, res, radius=5, dr=(0, 0), const=6, scale_const=0.7):
