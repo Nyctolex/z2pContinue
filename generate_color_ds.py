@@ -6,6 +6,8 @@ import numpy as np
 import argparse
 import pickle
 import matplotlib.pyplot as plt
+from tqdm import tqdm
+from time import time
 device = torch.device(
             torch.cuda.current_device() if torch.cuda.is_available() else
             torch.device("mps") if torch.backends.mps.is_available() else torch.device('cpu'))
@@ -33,7 +35,9 @@ def generate_color_dataset(source_dataset_path: Path, target_dataset_path: Path,
     outline_model.eval()
 
     vector_parse = lambda x: torch.tensor(x, dtype=torch.float32).to(device).unsqueeze(0)
-    for i in len(sample_set):
+    bar = tqdm(total=len(sample_set))
+    start_time = time()
+    for i in range(len(sample_set)):
         datapoint = sample_set[i]
         img, _, _, zbuffer, settings_dict, img_path, z_buffer_path = datapoint
         model_name = img_path.parent.parent.name
@@ -67,8 +71,15 @@ def generate_color_dataset(source_dataset_path: Path, target_dataset_path: Path,
             _, zbuffer = load_files(img_path, z_buffer_path, splat_size=outline_splat_size, cache=False)
             zbuffer = vector_parse(torch.from_numpy(zbuffer).unsqueeze(0))
             outline_img = outline_model(zbuffer, settings_vector).squeeze(0)
+            outline_img = torch.sigmoid(outline_img)
             outline_img = to_numpy(outline_img)
             cv2.imwrite(str(outline_img_path), outline_img)
+        bar.update(1)
+        avg_itter_time = (time() - start_time) / (i+1)
+        time_left = (len(sample_set) - i -1)*avg_itter_time
+        hours = time_left// 3600
+        minutes = (time_left%3600)//60
+        bar.set_description(f'Estimated time left{hours}h {minutes}m  Progress: {i}/{len(sample_set)}')
 
 
 
@@ -82,7 +93,6 @@ if __name__ == '__main__':
     parser.add_argument('--outline_controls', nargs='+', default=['colors', 'light_sph_relative'])
     parser.add_argument('--grayscale_pickle_path', type=Path)
     parser.add_argument('--outline_pickle_path', type=Path)
-    parser.add_argument('--splat_size', type=int)  #TODO diffarent splant size
     parser.add_argument('--grayscale_splat_size', type=int)
     parser.add_argument('--outline_splat_size', type=int)
 
