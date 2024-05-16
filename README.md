@@ -28,27 +28,27 @@ Before proceeding to any of the following steps, please make sure the datasets a
 
 ### Training the Gray-scale module
 
-The script for training the gray-scale module with the default parameters from the follow-up paper can be found in the ``script`` folder under the name ``TODO add name``. 
+The script for training the gray-scale module with the default parameters from the follow-up paper can be found in the ``scripts`` folder under the name ``scripts/train_grayscale.sh``. 
 Please make sure to provide the script with the path to the dataset and the path for exporting the trained model. For Example:
 ```
-TODO add the name of the script.sh /path/to/dataset/renders_shade_abs /path/to/dataset/renders_shade_abs_test /path/to/export/folder
+scripts/train_grayscale.sh.sh /path/to/train/dataset/dir /path/to/export/folder /path/to/test/dataset/dir /path/to/checkpoint/folder
 ```
+
 ### Training the outline module
-Similarly to the gray-scale module, you should run the script ``TODO add script name`` with the same order of parameters as specified in the previous section.
+Similarly to the gray-scale module, you should run the script ``scripts/train_outline.sh`` with the same order of parameters as specified in the previous section.
 
 ### Training the coloring module
-Make sure that previous to this step you had trained both the outlining and gray-scale modules. You should be able to find .pt files and .pkl files at the export dir of each one of the export folder of the previous modules. <br>
+Make sure that previous to this step you had trained both the outlining and gray-scale modules. You should be able to find .pt files in the ``export directory`` and .pkl files in the ``checkpoint directory`` of the previous modules. <br>
 Before training the Coloring Module, you should run the ``create_color_ds.sh`` script found in the 'scripts' folder. This would create an additional dataset constructed from the predictions of the Gray-scale and Outlining modules. <br> 
 ```
-create_coloring_ds.sh /path/to/dataset/renders_shade_abs path/to/grayscale.pkl path/to/outlining.pkl
+create_coloring_ds.sh /path/to/dataset/renders_shade_abs path/to/grayscale.pkl path/to/outlining.pkl /path/to/train/dataset/dir /path/to/test/dataset/dir
 ```
-Please make sure to create both training and testing sets for the coloring module. <br>
-After the dataset for the coloring module is created you should run the corresponding training script from the 'scrips' folder. For example:
+After the dataset for the coloring module is created you should run the corresponding training script from the ``scripts`` folder. For example:
 ```
-TODO add the name of the script.sh /path/to/coloring/dataset/train /path/to/coloring/dataset/train /path/to/export/folder
+scripts/train_color.sh /path/to/train/dataset/dir /path/to/export/folder /path/to/test/dataset/dir /path/to/checkpoint/folder
 ```
 
-## Inference TODO
+## Inference
 The notebook ``TODO`` provides an example of full inference. In the notebook, you can use the pre-trained weights and the sample point cloud to provide you with an output image. You also have examples for controlling the scene conditions  such as light direction and color.
 
 <img src="https://github.com/Nyctolex/z2pContinue/assets/65441185/626348fe-c0a5-4d2d-a1da-e470744acada" alt="drawing" width="1000rem"/>
