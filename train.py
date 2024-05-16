@@ -69,12 +69,17 @@ class Trainer:
 
     def load_data(self):
         opts = self.opts
-        train_set = data.GenericDataset(opts.data, splat_size=opts.splat_size, cache=opts.cache,
-                                        keys=opts.controls, train_strategy=self.train_strategy)
+        if self.train_strategy != TrainingStrategy.COLOR:
+            train_set = data.GenericDataset(opts.data, splat_size=opts.splat_size, cache=opts.cache,
+                                            keys=opts.controls, train_strategy=self.train_strategy)
+            test_set = data.GenericDataset(opts.test_data, splat_size=opts.splat_size, cache=opts.cache,
+                                           keys=opts.controls, train_strategy=self.train_strategy)
+        else:
+            train_set = data.ColorDataset(opts.data, keys=opts.controls)
+            test_set = data.ColorDataset(opts.test_data, keys=opts.controls)
         control_vector_length = train_set.control_length()
         logger.debug('loading test set')
-        test_set = data.GenericDataset(opts.test_data, splat_size=opts.splat_size, cache=opts.cache,
-                                       keys=opts.controls, train_strategy=self.train_strategy)
+
         test_elements = opts.batch_size * opts.test_batch_size
         test_set = torch.utils.data.random_split(test_set, [test_elements, len(test_set) - test_elements])[0]
 
@@ -169,12 +174,12 @@ class Trainer:
             settings_vector = parse_tensor(settings_vector)
             return img_paths, z_buffer, settings_vector, gray_scale
         elif self.train_strategy == TrainingStrategy.COLOR:
-            img_paths, img, outline, gray_scale, settings_vector = data
+            img_path, img, gray_img, outline_img , settings_vector = data
             img = parse_tensor(img)
-            outline = parse_tensor(outline)
-            gray_scale = parse_tensor(gray_scale)
+            gray_img = parse_tensor(gray_img)
+            outline_img = parse_tensor(outline_img)
             settings_vector = parse_tensor(settings_vector)
-            return img_paths, img, outline, gray_scale, settings_vector
+            return img_path, img, gray_img, outline_img , settings_vector
 
         else:
             raise NotImplementedError('Training strategy not implemented')
@@ -192,8 +197,8 @@ class Trainer:
             img_paths, zbuffer, settings_vector, gray_scale = data
             return self.model(zbuffer, settings_vector), gray_scale
         elif self.train_strategy == TrainingStrategy.COLOR:
-            img_paths, img, outline, gray_scale, settings_vector = data
-            input_data = torch.cat([gray_scale, outline], dim=1)
+            _, img, gray_img, outline_img , settings_vector = data
+            input_data = torch.cat([gray_img, outline_img], dim=1)
             return self.model(input_data, settings_vector), img
         else:
             raise NotImplementedError('Training strategy not implemented')
@@ -227,10 +232,10 @@ class Trainer:
             zbuffer = self.expand_dimensions(zbuffer)
             cat_img = torch.cat([gray_scale, prediction, zbuffer], dim=2)
         elif self.train_strategy == TrainingStrategy.COLOR:
-            _, img, outline, gray_scale, settings_vector = data
-            outline = self.expand_dimensions(outline)
-            gray_scale = self.expand_dimensions(gray_scale)
-            cat_img = torch.cat([outline, gray_scale, prediction, img], dim=2)
+            _, img, gray_img, outline_img , settings_vector = data
+            outline_img = self.expand_dimensions(outline_img)
+            gray_img = self.expand_dimensions(gray_img)
+            cat_img = torch.cat([outline_img, gray_img, prediction, img], dim=2)
         else:
             raise NotImplementedError('Training strategy not implemented')
         log_images(export_dir, f'train_imgs{iteration}', cat_img.detach(), settings_vector)
