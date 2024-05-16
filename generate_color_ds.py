@@ -104,5 +104,7 @@ if __name__ == '__main__':
         outline_model=outline_model, grayscale_splat_size = opts.grayscale_splat_size,
                            outline_splat_size= opts.outline_splat_size, grayscale_keys = opts.grayscale_controls,
                             outline_keys = opts.outline_controls)
-    # ds = ColorDataset(opts.export_dir)
-    # print(len(ds))
+    ds = ColorDataset(opts.data_dir)
+    #print(len(ds))
+    #for x in ds:
+    #    pass
