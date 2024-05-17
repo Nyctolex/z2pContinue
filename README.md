@@ -1,5 +1,6 @@
 # Z2P: Instant Visualization of Point Clouds - A follow-up research
-<img src="https://github.com/Nyctolex/z2pContinue/assets/65441185/50252620-caa6-4ee4-b959-d53331f384fa" alt="drawing" width="1000rem"/>
+<img src="https://github.com/Nyctolex/z2pContinue/assets/65441185/972204ff-0f92-4eee-b295-6b1bdf4ce91a" alt="drawing" width="1000rem"/>
+
 
 Original paper can be found at [[Paper]](https://arxiv.org/abs/2105.14548)<br>
 # Getting Started
