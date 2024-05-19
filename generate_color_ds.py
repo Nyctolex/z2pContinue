@@ -11,7 +11,7 @@ from time import time
 device = torch.device(
             torch.cuda.current_device() if torch.cuda.is_available() else
             torch.device("mps") if torch.backends.mps.is_available() else torch.device('cpu'))
-
+torch.set_default_dtype(torch.float64)
 
 def to_numpy(im, clip=False, sigmiod=False):
     if sigmiod:
@@ -34,7 +34,7 @@ def generate_color_dataset(source_dataset_path: Path, target_dataset_path: Path,
     grayscale_model.eval()
     outline_model.eval()
 
-    vector_parse = lambda x: torch.tensor(x, dtype=torch.float32).to(device).unsqueeze(0)
+    vector_parse = lambda x: torch.tensor(x, dtype=torch.float64).to(device).unsqueeze(0)
     bar = tqdm(total=len(sample_set))
     start_time = time()
     for i in range(len(sample_set)):
