@@ -21,6 +21,13 @@ The datasets used for the paper can be downloaded from Google Drive. For the fol
 If you wish to use the ***cache option*** at train time please space for around 350GB of disk space. <br>
 This will save the 2D point cloud z-buffers to disk and allow for faster training. 
 
+## Pre-Trained models and Results Preview
+You can download the weights of our final model and sample outputs by clicking  <a href="https://drive.google.com/file/d/1p3WJp6dH4q1O_loa-VQmoEfLNJPWkSCe/view"> here. </a>. <br>
+
+
+### Exploring Training Variations:
+
+To gain a deeper understanding of how the model's behavior is affected by different loss functions and training strategies, we invite you to download the <a href="https://drive.google.com/file/d/1DejloVqvhuunAaPSufPQXbi9N6VXZdSO/view?usp=sharing"> following folder. </a>. This folder contains various models trained under different settings, along with their corresponding results. <br>
 
 ## Training
 The structure of the model providing the final RGBA images is built on three sub-modules: the Gray-scale module, the Outlining module, and the Coloring module. Each of these modules can be trained independently.<be>
