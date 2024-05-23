@@ -22,7 +22,7 @@ If you wish to use the ***cache option*** at train time please space for around 
 This will save the 2D point cloud z-buffers to disk and allow for faster training. 
 
 
-## TODO Training
+## Training
 The structure of the model providing the final RGBA images is built on three sub-modules: the Gray-scale module, the Outlining module, and the Coloring module. Each of these modules can be trained independently.<be>
 In cases where only the gray-scale result is required, you could go to the 'Training the Gray-scale module' section and ignore the rest. <br>
 Before proceeding to any of the following steps, please make sure the datasets are downloaded and extracted to disk.
@@ -39,10 +39,10 @@ scripts/train_grayscale.sh.sh /path/to/train/dataset/dir /path/to/export/folder 
 Similarly to the gray-scale module, you should run the script ``scripts/train_outline.sh`` with the same order of parameters as specified in the previous section.
 
 ### Training the coloring module
-Make sure that previous to this step you had trained both the outlining and gray-scale modules. You should be able to find .pt files in the ``export directory`` and .pkl files in the ``checkpoint directory`` of the previous modules. <br>
+Make sure that previous to this step you had trained both the outlining and gray-scale modules. You should be able to find .pt files in the ``export directory`` and .pkl files in the ``checkpoint directory`` of the previous modules. Alternatively, you can download the pre-trained modules in the following <a href="https://drive.google.com/file/d/1p3WJp6dH4q1O_loa-VQmoEfLNJPWkSCe/view"> link</a>. <br>
 Before training the Coloring Module, you should run the ``create_color_ds.sh`` script found in the 'scripts' folder. This would create an additional dataset constructed from the predictions of the Gray-scale and Outlining modules. <br> 
 ```
-create_coloring_ds.sh /path/to/dataset/renders_shade_abs path/to/grayscale.pkl path/to/outlining.pkl /path/to/train/dataset/dir /path/to/test/dataset/dir
+create_coloring_ds.sh /path/to/dataset/renders_shade_abs /path/to/export/dir path/to/grayscale.pkl path/to/outlining.pkl
 ```
 After the dataset for the coloring module is created you should run the corresponding training script from the ``scripts`` folder. For example:
 ```
@@ -50,7 +50,7 @@ scripts/train_color.sh /path/to/train/dataset/dir /path/to/export/folder /path/t
 ```
 
 ## Inference
-The notebook ``TODO`` provides an example of full inference. In the notebook, you can use the pre-trained weights and the sample point cloud to provide you with an output image. You also have examples for controlling the scene conditions  such as light direction and color.
+The notebook ``demo.ipynb`` provides an example of full inference. You can use the pre-trained weights and the sample point found <a href="https://drive.google.com/file/d/1p3WJp6dH4q1O_loa-VQmoEfLNJPWkSCe/view"> here </a>.
 
 <img src="https://github.com/Nyctolex/z2pContinue/assets/65441185/626348fe-c0a5-4d2d-a1da-e470744acada" alt="drawing" width="1000rem"/>
 <img src="https://github.com/Nyctolex/z2pContinue/assets/65441185/608d66b4-90c3-44bc-98d6-5334148d09a4" alt="drawing" width="1000rem"/>
