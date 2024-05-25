@@ -29,6 +29,9 @@ You can download the weights of our final model and sample outputs by clicking  
 
 To gain a deeper understanding of how the model's behavior is affected by different loss functions and training strategies, we invite you to download the <a href="https://drive.google.com/file/d/1DejloVqvhuunAaPSufPQXbi9N6VXZdSO/view?usp=sharing"> following folder. </a>. This folder contains various models trained under different settings, along with their corresponding results. <br>
 
+## Evaluation
+To generate images from point clouds using our model please see the 'demo.ipynb' file. There you can download our model's weights as well as a sample from the dataset and see the model in work. For additional examples please download the test or train datasets and update the 'data_path' variable in the notebook to the correct path of your dataset.
+
 ## Training
 The structure of the model providing the final RGBA images is built on three sub-modules: the Gray-scale module, the Outlining module, and the Coloring module. Each of these modules can be trained independently.<be>
 In cases where only the gray-scale result is required, you could go to the 'Training the Gray-scale module' section and ignore the rest. <br>
